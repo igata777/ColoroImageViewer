@@ -1,0 +1,136 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{A2539B82-42AE-4A8B-9918-0DA558965569}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>IPPLibrary</RootNamespace>
+    <AssemblyName>ColorImageViewProject</AssemblyName>
+    <TargetFrameworkVersion>v4.7.1</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>x86</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>x86</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="DevelopLog">
+      <HintPath>..\RequestQueueProjectDll_Net4_0用\DevelopLog.dll</HintPath>
+    </Reference>
+    <Reference Include="RequestQueue">
+      <HintPath>..\RequestQueueProjectDll_Net4_0用\RequestQueue.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="CompositeLocalSettings.cs" />
+    <Compile Include="FormColorImageS.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FormColorImageS.Designer.cs">
+      <DependentUpon>FormColorImageS.cs</DependentUpon>
+    </Compile>
+    <Compile Include="FormConfigurationData.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FormConfigurationData.Designer.cs">
+      <DependentUpon>FormConfigurationData.cs</DependentUpon>
+    </Compile>
+    <Compile Include="FormDirectNumerical.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FormDirectNumerical.Designer.cs">
+      <DependentUpon>FormDirectNumerical.cs</DependentUpon>
+    </Compile>
+    <Compile Include="FormProfileViewer.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="FormProfileViewer.Designer.cs">
+      <DependentUpon>FormProfileViewer.cs</DependentUpon>
+    </Compile>
+    <Compile Include="IPP_PluginConfigData.cs" />
+    <Compile Include="PP_PluginConfigData.cs" />
+    <Compile Include="PP_Utility.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <Compile Include="ScalablePbox.cs" />
+    <Compile Include="SetingsRateForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="SetingsRateForm.Designer.cs">
+      <DependentUpon>SetingsRateForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="SettingSizeForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="SettingSizeForm.Designer.cs">
+      <DependentUpon>SettingSizeForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="UtilityGraphics.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="FormColorImageS.resx">
+      <DependentUpon>FormColorImageS.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="FormConfigurationData.resx">
+      <DependentUpon>FormConfigurationData.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="FormProfileViewer.resx">
+      <DependentUpon>FormProfileViewer.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Include="SetingsRateForm.resx">
+      <DependentUpon>SetingsRateForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="SettingSizeForm.resx">
+      <DependentUpon>SettingSizeForm.cs</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

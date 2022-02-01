@@ -1,0 +1,2345 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Windows.Forms;
+using System.Drawing.Imaging;
+using System.Text.RegularExpressions;
+using System.Drawing.Drawing2D;
+using System.IO;
+
+
+
+// 2018/10/23 拡大・縮小メソッド追加。(アプリケーションからCtrl + ±　キーで拡大／縮小に対応）。
+// 2017/12/25 （ScalablePboxの機能追加に合わせ）従来のFit方法(全面)に縦Fit, 横Fitを追加  
+// 2018/08/15 プロファイル機能の追加。
+// 2018/08/17 表示情報を拡張するため、フォーマットをプラグイン文字列設定値と合わせる
+// 2018/09/29 1. HSV表示　　2.Ctrl+↑　等で不透明度を変更可能とした　　3. ショートカット Ctrl+Sなどで画像の保存など
+// 2019/03/15 画像サイズを左上に表示
+// 2019/11/14 カーソル上の色情報・YCbCr値を表示に追加 labelMouseCursor3
+// 2019/11/22 設定に BackColor　背景（画像のない部分）の色を追加。
+// 2020/04/13 プロファイル表示不具合対応、プロファイル位置カーソル機能追加、Ctrl+SPCでプロファイル再表示、Ctrl+クリック時自動でラインモードにする
+// 2020/07/18 プロファイルからのCSV出力でB要素値がR要素になっていた不具合を修正　OutCsvfilePixels()内
+// 2020/07/21 ボックス・ラインモードで対象ピクセルをCSVファイルだけでなく、クリップボードコピーにも対応。
+// 2020/07/21 ボックス・ラインモード時に対象ピクセルの平均色を表示
+// 2021/03/25 ボックス・ラインモード時にプロファイル範囲（始点・終点または全体）を移動可能とした。
+// 2021/03/28 プロファイル移動モードの不具合修正。＋　OnClick, OnMouseMoveでのリターン値をtrueにして、再描画指定をコメントアウト。→影響様子見。
+
+namespace ColorImageViewProject
+{
+	/// <summary>カラー情報表示用フォームクラスです</summary>
+	public partial class FormColorImageS : Form
+	{
+		/// <summary>ScalablePboxのインスタンスを保持します</summary>
+		private ScalablePbox _scalePbox;
+
+		/// <summary>表示対象画像(24bit)を保持します</summary>
+		private Bitmap _sourceImage;
+
+
+		/// <summary>キー入力待ちするか否かの情報を保持します</summary>
+		private bool _isHitAnyKey;
+		/// <summary>設定情報を保持します</summary>
+		private ColImageSetteings _settings;
+		
+		/// <summary>初期表示情報文字列を保持します。初期表示後はnullでクリアします</summary>
+		private string _initDispInfoString = null;
+		/// <summary>なぜかラベルの表示がずれるための暫定対応。(調整用）labesDispInfo </summary>
+		private Point _debLabelPos;
+
+		/// <summary>フォームをクローズするときに呼び出されるアクションを保持します。</summary>
+		private Action _actOnClosed;
+
+		// <param name="isFitWidth"></param>
+		/// <summary>画像フィット情報を保持します。　横フィットを指定：true, 縦フィット：false, 全面：null</summary>
+		private bool? _isFitImageWidth;
+
+
+		/// <summary>プロファイル・ライン用ビューワーフォームを保持します</summary>
+		private FormProfileViewer _formProfViewerLine;
+		/// <summary>垂直プロファイル用（水平方向に計算）ビューワーフォームを保持します</summary>
+		private FormProfileViewer _formProfViewerBoxH;
+		/// <summary>水平プロファイル用（垂直方向に計算）ビューワーフォームを保持します</summary>
+		private FormProfileViewer _formProfViewerBoxV;
+
+		/// <summary>Lineモード・簡易距離計測モードポイント（開始点）</summary>
+		private Point? _measureModePointB = null;
+
+		/// <summary>Lineモード・簡易距離計測モードポイント（終了点）</summary>
+		private Point? _measureModePointE = null;
+
+		/// <summary>Lineモード／BoxモードのときのCtrlモード判定(Ctrlが押されたまま）を示します。</summary>
+		private bool _isMeasureMode = false;
+
+		
+		/// <summary>プロファイルモード（null:なし、true:ラインモード、 false:ボックスモード）を保持します</summary>
+		private bool? _isProfModeLine;
+
+		/// <summary>プロファイル範囲移動モードフラグです。　全体を移動：true, Bgn側のみ移動:false, 移動モードでない場合nullを示すフラグ</summary>
+		/// <remarks>PointEを移動するのは通常のMeasureModeで対応するため、本フラグはnullの状態とする</remarks>
+		private bool? _isProfPosMovAll;
+		/// <summary>_isProPosMoveAllがnullでなくなったときのクリック位置を保存します（_isProfPosMoveAllがnullの場合には無効）</summary>
+		private Point _profPosMovClickPos;
+		/// <summary>_isProPosMoveAllがnullでなくなったときの始点位置を保存します（_isProfPosMoveAllがnullの場合には無効）</summary>
+		private Point _profPosMovOrgPosB;
+		/// <summary>_isProPosMoveAllがnullでなくなったときの終点位置を保存します（_isProfPosMoveAllがnullの場合には無効）</summary>
+		private Point _profPosMovOrgPosE;
+
+
+
+
+		/// <summary>フォームの不透明度を決定する番号を保持します。(0-7) 0:30%, 1:40% ・・7:100%</summary>
+		private int _opacityNumber;
+		/// <summary>フォームの不透明度を決定する番号最大数＝分割数</summary>
+		const	int MaxOpcityNumber = 9;
+		/// <summary>フォームの不透明度最小 Opcity値（不透明度）</summary>
+		const double MinOpcityValue = 0.1;
+
+		/// <summary>ラインプロファイル用カーソルオフセット(距離）を保持します</summary>
+		/// <remarks>ラインは斜めがあるので距離（double型)で表す</remarks>
+		private double? _pcLine;
+		/// <summary>ボックス水平プロファイル用カーソルオフセットを保持します</summary>
+		private int? _pcBoxH;
+		/// <summary>ボックス垂直プロファイル用カーソルオフセットを保持します</summary>
+		private int? _pcBoxV;
+
+
+		/// <summary>コンストラクタです</summary>
+		/// <param name="bmp">表示対象画像</param>
+		/// <param name="title">タイトル</param>
+		/// <param name="isHitAnyKey">入力待ち</param>
+		/// <param name="posX">初期表示位置 x</param>
+		/// <param name="posY">初期表示位置 y</param>
+		/// <param name="initDispInfoString">初期表示情報文字列（クリップボード保存と同じフォーマット）</param>
+		/// <param name="setdata">設定情報</param>
+		/// <param name="icon">Iconの指定</param>
+		/// <param name="onClosed">フォームをクローズするときに呼び出されるアクションを指定します</param>
+		/// <param name="isFitWidth">画像フィット情報（初期表示情報がないときのみ有効）　横フィットを指定：true, 縦フィット：false, 全面：null（無指定時）</param>
+		/// <param name="isProfileFunction">プロファイル機能関連のコントロールの有効・無効（デフォルト有効）</param>
+		/// <remarks>指定画像・設定値などの指定パラメータはコンストラクタ内でクローンを生成するため、指定後は呼び出し側で破棄可能。</remarks>
+		public FormColorImageS(Bitmap bmp, string title, bool isHitAnyKey = false, int posX = -1, int posY = -1, string initDispInfoString= null, ColImageSetteings setdata= null, Icon icon= null, Action　onClosed = null, bool? isFitWidth= null, bool isProfileFunction= true )
+		{
+			InitializeComponent();
+
+			_debLabelPos = new Point(this.Width - labelDispInfo.Location.X, this.Height - labelDispInfo.Location.Y);
+			
+			_settings = (setdata != null)? (ColImageSetteings)setdata.Clone() : new ColImageSetteings();
+			this.Text = title;
+			_sourceImage = (Bitmap)bmp.Clone();
+			_isHitAnyKey = isHitAnyKey;
+
+			// 位置が指定されていれば、指定位置に表示する
+			if (posX >= 0 && posY >= 0 )
+			{
+				StartPosition = FormStartPosition.Manual;
+				this.Location = new Point(posX, posY);
+			}
+			_initDispInfoString = initDispInfoString;
+
+			if (icon != null) this.Icon = (Icon)icon.Clone();
+
+			_actOnClosed = onClosed;
+
+			_isFitImageWidth = isFitWidth;
+
+			// 24ビット画像で無い場合には、プロファイル機能は禁止する。（現状24ビット画像のみ対応しているため）
+			if (bmp.PixelFormat != PixelFormat.Format24bppRgb) gboxProfileMode.Enabled = false;
+
+			// プロファイル機能コントロールの有効・無効
+			tboxProfInfo.Visible = labelProfSize.Visible = gboxProfileMode.Visible = isProfileFunction;
+
+			// 
+			_opacityNumber = MaxOpcityNumber;     // 100% = this.Opacity = _opacityNumber * (1.0-MinOpcityValue)/MaxOpcityNumber + MinOpcityValue; 
+			_pcLine = _pcBoxH = _pcBoxV = null;
+
+		}
+
+
+		/// <summary>フォームの生成と表示を行います</summary>
+		/// <param name="bmp">表示対象画像</param>
+		/// <param name="title">タイトル</param>
+		/// <param name="isHitAnyKey">入力待ち</param>
+		/// <param name="posX">初期表示位置 x</param>
+		/// <param name="posY">初期表示位置 y</param>
+		/// <param name="isOffsetPos">前回とのオフセット位置</param>
+		/// <param name="initDispInfoString">初期表示情報文字列（クリップボード保存と同じフォーマット）</param>
+		/// <param name="setdata">設定情報</param>
+		/// <param name="icon">Iconの指定</param>
+		static public void CreateForm(Bitmap bmp, string title, bool isHitAnyKey = false, int posX = -1, int posY = -1, string initDispInfoString = null, ColImageSetteings setdata = null, Icon icon = null)
+		{
+			var frm = new FormColorImageS( bmp, title, isHitAnyKey, posX, posY, initDispInfoString, setdata, icon );
+			if (isHitAnyKey) frm.ShowDialog();
+			else frm.Show();
+		}
+
+		
+		/// <summary>フォームロード時の処理です</summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void FormColorImageS_Load(object sender, EventArgs e)
+		{
+			_scalePbox = new ScalablePbox(this, pboxColImage, (mat, rate) =>
+			{
+				labelDisplayRate.Text = String.Format("{0:###0.0 %}", rate);
+				Refresh();
+				return false;
+			},
+				OnPboxClick,
+				OnMouseMove,
+				null,
+				OnPaintPbox
+			);
+			//　ScalablePbox規定値・および設定
+			_scalePbox.MaxRateMainImage = 100.0f;
+			_scalePbox.MinRateMainImage = 0.125f;
+			_scalePbox.BasePbox.BackColor = _settings != null ? _settings.BackColor : Color.Black ;
+			_scalePbox.InterpolationMode = _settings!= null ? _settings.MainInterpolationMode: InterpolationMode.NearestNeighbor;
+			_scalePbox.InterpolationModeReduce = _settings != null ? _settings.MainInterpolationModeReduce : InterpolationMode.HighQualityBilinear;
+			_scalePbox.ChangeMainImage(_sourceImage);
+			_scalePbox.SizeChanged();
+
+			lblImageSize.Text= _sourceImage.Size.ToString();
+
+			// 初期表示状態の指定
+			var iniDisp = false;
+			if (_initDispInfoString != null )
+			{
+				int xx, yy, width, height;
+				Dictionary<string, string> dic;
+				float rate;
+				if (ParseDispInfoString(_initDispInfoString, out xx, out yy, out rate, out width, out height, out dic))
+				{
+					// 取得した情報に合わせて、画面や表示状態を調整する。（必須項目）
+					iniDisp = AdjustFromDispInfo(xx, yy, rate, width, height);
+
+					// オプション項目の設定
+					AdjustOptionFromDic(dic);
+				}
+				_initDispInfoString = null;
+			}
+			if( iniDisp == false )
+			{
+				FitImage( _isFitImageWidth );
+			}
+			labelDispInfo.Text = String.Format("[ {0} x {1} ]", pboxColImage.Width, pboxColImage.Height);
+
+			// 計測モード、PointB,Eをクリア
+			ClearMeasureMode();
+
+			// Fixモードの反映
+			_scalePbox.IsFixed = cboxFix.Checked;
+
+			// キーを一旦フォームが受け取る
+			this.KeyPreview = true;
+        }
+
+
+		/// <summary>
+		/// 指定したIcon（の複製）をアイコンとして設定します
+		/// </summary>
+		/// <param name="icon">アイコン</param>
+		public void SetIcon(Icon icon)
+		{
+			this.Icon = (Icon)icon.Clone();
+			Refresh();
+		}
+
+		/// <summary>メインピクチャーボックス(ScalablePbox)のクリック時の処理です</summary>
+		/// <param name="x">元データのX座標</param>
+		/// <param name="y">元データのY座標</param>
+		/// <param name="col">表示している位置の色情報</param>
+		/// <param name="down">ボタン・ダウンの場合真</param>
+		/// <param name="isLeft">左ボタンの場合真</param>
+		/// <param name="posF">詳細位置（未使用）</param>
+		/// <returns>再描画要求の有無（本ケースでは常にfalse）</returns>
+		private bool OnPboxClick(int x, int y, Color col, bool down, bool isLeft, PointF posF)
+		{
+
+			// 関係するモードでなければ、リターンするコードを追加予定
+
+			// 表示条件に合わない場合、何もしない
+			if ((x < 0 || y < 0) || _sourceImage == null)
+			{
+				return false;
+			}
+
+			// ボタンが上がった時のイベントおよび左クリック以外は無視
+			if (down == false || isLeft == false)
+			{
+				if (_isProfPosMovAll != null)
+				{
+					_isProfPosMovAll = null;
+					_isMeasureMode = false;
+				}
+				return false;
+			}
+
+			// 非プロファイルモードで Ctrl+クリック（コントロールキーが押されているかつダウン）時の振る舞い→ラインモードにする
+			if (_isProfModeLine == null && (Control.ModifierKeys & Keys.Control) == Keys.Control && down)
+			{
+				rbtnProfModeLine.Checked = true;
+				// すぐに表示されるとラインを引くのに邪魔なので消しておく、マウスup時（ポイント決定時）に再表示させて対応※1（またはCtrl+SPCで表示させる）
+				_formProfViewerLine.Hide();
+			}
+
+			// プロファイルモードで Ctrl+クリック（コントロールキーが押されているかつダウン）時の振る舞い
+			if (_isProfModeLine != null && (Control.ModifierKeys & Keys.Control) == Keys.Control && down)
+			{
+				if (_measureModePointB == null)
+				{
+					_measureModePointB = new Point(x, y);
+				}
+				else if (_isMeasureMode || _measureModePointE == null)
+				{
+					_measureModePointE = new Point(x, y);
+				}
+				// 計測モードでなく、B,Eともにセットされている場合
+				else
+				{
+					// （プロファイル範囲の）移動モード条件に一致する場合→プロファイル範囲移動モード条件セット
+					if (CheckProfPosMov(x, y))
+					{
+					}
+					// 移動モード条件に一致しない場合
+					else
+					{
+						// PointBから指定開始する
+						_measureModePointB = new Point(x, y);
+						_measureModePointE = null;
+					}
+				}
+				_isMeasureMode = true;
+			}
+			else
+			{
+				_isMeasureMode = false;
+			}
+			//pboxColImage.Refresh();
+			//return false;
+			return true;
+		}
+
+
+		/// <summary>
+		/// CTRL+クリックされた位置で（プロファイル範囲の）移動モード条件をチェックし、一致すれば条件をセットする</summary>
+		/// <param name="x">クリック位置　ｘ</param>
+		/// <param name="y">クリック位置　ｙ</param>
+		/// <returns>移動モード移行(true:移行した false:移行せず）</returns>
+		private bool CheckProfPosMov(int x, int y)
+		{
+			double NpLimit = Math.Max(1.0, 5.0 / _scalePbox.DispRate);      // 5px→実距離に変換
+			if (_isMeasureMode) { _isProfPosMovAll = null; return false; }
+			var pos = new Point(x, y);
+
+			// End点に近いときには　計測モード・PointEが未決定であることにする
+			if (_measureModePointE != null && UtilityGraphics.CalcDistance(pos, _measureModePointE.Value) <= NpLimit)
+			{
+				_measureModePointE = null;
+				_isMeasureMode = true;
+				_isProfPosMovAll = null;
+				return true;
+			}
+			// 開始点に近いときは、 _isProfPosMovAll←falseをセット(全体移動ではなく、開始点移動である旨指示）
+			else if (_measureModePointB != null && UtilityGraphics.CalcDistance(pos, _measureModePointB.Value) <= NpLimit)
+			{
+				_measureModePointB = pos;
+				_isProfPosMovAll = false;       // PointB移動
+				_profPosMovClickPos = pos;
+				_profPosMovOrgPosB = _measureModePointB.Value;
+			}
+			// ラインプロファイル中でそのラインに近いときは、 _isProfPosMovAll←trueをセット(全体移動である旨指示）
+			else if (_isProfModeLine == true && _measureModePointB != null && _measureModePointE != null && UtilityGraphics.DistanceLineToPoint(_measureModePointB.Value, _measureModePointE.Value, pos) < NpLimit)
+			{
+				_isProfPosMovAll = true;       // 全体移動
+				_profPosMovClickPos = pos;
+				_profPosMovOrgPosB = _measureModePointB.Value;
+				_profPosMovOrgPosE = _measureModePointE.Value;
+			}
+			// ボックスプロファイル中でその矩形内のときは、 _isProfPosMovAll←trueをセット(全体移動である旨指示）
+			else if (_isProfModeLine == false && _measureModePointB != null && _measureModePointE != null && new Rectangle(Math.Min(_measureModePointB.Value.X, _measureModePointE.Value.X), Math.Min(_measureModePointB.Value.Y, _measureModePointE.Value.Y), Math.Abs(_measureModePointB.Value.X - _measureModePointE.Value.X) + 1, Math.Abs(_measureModePointB.Value.Y - _measureModePointE.Value.Y) + 1).Contains(pos))
+			{
+				_isProfPosMovAll = true;       // 全体移動
+				_profPosMovClickPos = pos;
+				_profPosMovOrgPosB = _measureModePointB.Value;
+				_profPosMovOrgPosE = _measureModePointE.Value;
+			}
+
+
+			return _isProfPosMovAll != null;
+		}
+
+
+
+		/// <summary>マウスカーソル移動時の処理です</summary>
+		/// <param name="x">X位置</param>
+		/// <param name="y">Y位置</param>
+		/// <param name="col">色情報</param>
+		/// <param name="posF">詳細位置</param>
+		/// <param name="isDown">マウスボタン状態（ダウン時真）未使用</param>
+		private bool OnMouseMove(int x, int y, Color col, bool isDown, PointF posF )
+		{
+			labelMouseCursorXY.Text = String.Format("( {0,4},{1,4} )", x, y);
+			lblSubPx.Text =  $"( {posF.X.ToString("0.00").PadLeft(8)} , {posF.Y.ToString("0.00").PadLeft(8)} )";
+			labelMouseCursor1.Text= String.Format( "RGB [{0,3},{1,3},{2,3}]  ({3,3})",col.R, col.G, col.B, RgbToGray(col.R,col.G,col.B) );
+			int hh, ss, vv;
+			UtilityGraphics.HsvFromRgb(col.R, col.G, col.B, out hh, out ss, out vv);
+			labelMouseCursor2.Text = String.Format("HSV [{0,3},{1,3},{2,3}]", hh, ss, vv);
+			var ybc = UtilityGraphics.YCrCbFromRGB(col.R, col.G, col.B);
+			labelMouseCursor3.Text = $"YCrCb [{ybc.Y,4},{ybc.Cr,4},{ybc.Cb,4}]";
+
+			// 測定モード(Ctrl押下）中の移動
+			if ( _isMeasureMode== true)
+			{
+			   if ((Control.ModifierKeys & Keys.Control) != Keys.Control)
+			   {
+				   _isMeasureMode = false;
+				   return false;
+			   }
+			   // 表示条件に合わない場合、何もしない
+			   if ((x < 0 || y < 0) || _sourceImage == null)
+			   {
+				   return false;
+			   }
+
+				// 移動モード中でない場合の処理
+				if (_isProfPosMovAll == null)
+				{
+					// ポイント(Begin)が設定されていれば、現在の場所を(End)に設定する
+					if (_measureModePointB != null)
+					{
+						// シフトも同時に押されていれば、開始点から水平または垂直の位置に終了ポイントを設定する。（カーソル自体は移動しない）
+						if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
+						{
+							if (Math.Abs(_measureModePointB.Value.X - x) < Math.Abs(_measureModePointB.Value.Y - y)) x = _measureModePointB.Value.X;
+							else y = _measureModePointB.Value.Y;
+						}
+						_measureModePointE = new Point(x, y);
+					}
+				}
+				else if (_isProfPosMovAll == true)
+				{
+					var ofsX = x - _profPosMovClickPos.X;
+					var ofsY = y - _profPosMovClickPos.Y;
+					// シフトも同時に押されていれば、開始点から水平または垂直の位置に終了ポイントを設定する。（カーソル自体は移動しない）
+					if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
+					{
+						if (Math.Abs(ofsX) < Math.Abs(ofsY)) ofsX = 0;
+						else ofsY = 0;
+					}
+
+					var posB = new Point( _profPosMovOrgPosB.X + ofsX, _profPosMovOrgPosB.Y + ofsY );
+					var posE = new Point(_profPosMovOrgPosE.X + ofsX, _profPosMovOrgPosE.Y + ofsY);
+
+					if (Math.Min(posB.X, posE.X) >= 0 && Math.Max(posB.X, posE.X) <= _scalePbox.MainImageWidth && Math.Min(posB.Y, posE.Y) >= 0 && Math.Max(posB.Y, posE.Y) <= _scalePbox.MainImageHeight)
+					{
+						_measureModePointB = posB;
+						_measureModePointE = posE;
+					}
+				}
+				else if (_isProfPosMovAll == false)
+				{
+					var ofsX = x - _profPosMovClickPos.X;
+					var ofsY = y - _profPosMovClickPos.Y;
+					// シフトも同時に押されていれば、開始点から水平または垂直の位置に終了ポイントを設定する。（カーソル自体は移動しない）
+					if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
+					{
+						if (Math.Abs(ofsX) < Math.Abs(ofsY)) ofsX = 0;
+						else ofsY = 0;
+					}
+					var posB = new Point(_profPosMovOrgPosB.X + ofsX, _profPosMovOrgPosB.Y + ofsY);
+					if( posB.X>= 0 && posB.X < _scalePbox.MainImageWidth )	_measureModePointB = posB;
+				}
+
+			}
+
+		   return true;
+		}
+
+
+		/// <summary>
+		/// RGB値からグレー値（輝度値）を算出する</summary>
+		/// <param name="rr">赤成分</param>
+		/// <param name="gg">緑成分</param>
+		/// <param name="bb">青成分</param>
+		/// <returns>グレー値（輝度）</returns>
+		private int RgbToGray(int rr, int gg, int bb)
+		{
+			return (int)(rr * 0.299 + gg * 0.587 + bb * 0.114);
+		}
+
+
+		/// <summary>
+		/// ズーム時の動作です</summary>
+		/// <param name="isFitWidth">横フィットを指定：true, 縦フィット：false, 全面：null（無指定時）</param>
+		/// <returns>調整後の表示倍率</returns>
+		/// <remarks>メソッド FitImageとの違いはダイアログ余白の調整を行わないこと（画像の拡大縮小のみ）</remarks>
+		public float ZoomImage(bool? isFitWidth = null)
+		{
+			if (_scalePbox.IsFixed) return _scalePbox.DispRate;
+
+			// 画像をフィットさせる。
+			return _scalePbox.Zoom(isFitWidth);
+		}
+
+
+		/// <summary>
+		/// フィット時の動作です</summary>
+		/// <param name="isFitWidth">横フィットを指定：true, 縦フィット：false, 全面：null（無指定時）</param>
+		/// <returns>調整後の表示倍率</returns>
+		/// <remarks>メソッド ZoomImageとの違いはダイアログ余白の調整を行い、ダイアログ自体のサイズも変更する</remarks>
+		public float FitImage(bool? isFitWidth = null)
+		{
+			if (_scalePbox.IsFixed) return _scalePbox.DispRate;
+
+			// 画像をフィットさせる。
+			var rate = _scalePbox.Zoom(isFitWidth);
+			// 余白を調整する
+			var newWidth = (int)(_sourceImage.Width * rate);
+			var newHeight = (int)(_sourceImage.Height * rate);
+			this.Width -= _scalePbox.BasePbox.Width - newWidth;
+			this.Height -= _scalePbox.BasePbox.Height - newHeight;
+			return rate;
+		}
+
+
+		/// <summary>ピクチャーボックスをダブルクリックしたときの処理です。（画像をフィットします）</summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		/// <remarks>通常は画像を画面に合わせる。Altキーが押されている場合には逆に余白を削除して画像に合わせる</remarks>
+		private void pboxColImage_DoubleClick(object sender, EventArgs e)
+		{
+			// シフトキーが押されていた場合には余白削除
+			if( (ModifierKeys & Keys.Alt) == Keys.Alt )
+			{
+				AdjustPictureBoxSize();
+			}
+			else{
+				// 全面フィット
+				FitImage();
+			}
+		}
+
+		/// <summary>
+		/// 「表示画像をファイルに保存」が選択されたときの処理です</summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void 表示画像をファイルに保存ToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			if (pboxColImage.Image == null) return;
+			SaveImageFile((Bitmap)pboxColImage.Image);
+		}
+
+
+		/// <summary>画像イメージを名前をつけて保存</summary>
+		/// <param name="bmp">画像イメージ</param>
+		private void SaveImageFile(Bitmap bmp)
+		{
+			var sfd = new SaveFileDialog();
+
+			//はじめのファイル名を指定する
+			sfd.FileName = "Image";
+			//はじめに表示されるフォルダを指定する
+			sfd.InitialDirectory = System.Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+			//[ファイルの種類]に表示される選択肢を指定する
+			sfd.Filter = "PNGファイル(*.png)|*.png|JPGファイル(*.jpg)|*.jpg|ビットマップファイル(*.bmp)|*.bmp|TIFFファイル(*.tif)|*.tif|すべてのファイル(*.*)|*.*";
+			//[ファイルの種類]ではじめに「PNGファイル」が選択されているようにする
+			sfd.FilterIndex = 1;
+			//タイトルを設定する
+			sfd.Title = "保存ファイルを選択してください";
+			//ダイアログボックスを閉じる前に現在のディレクトリを復元するようにする
+			sfd.RestoreDirectory = true;
+			//ダイアログを表示する
+			if (sfd.ShowDialog() == DialogResult.OK)
+			{
+				//OKボタンがクリックされたとき
+				// 拡張子に強制的にあわせる場合には、ここにコードを入れること（現在はインデックスにより決定される）
+				var it = new ImageFormat[] { ImageFormat.Png, ImageFormat.Jpeg, ImageFormat.Bmp, ImageFormat.Tiff };
+				ImageFormat fmt = (sfd.FilterIndex > 0 && sfd.FilterIndex < it.Length) ? it[sfd.FilterIndex - 1] : ImageFormat.Png;
+				bmp.Save(sfd.FileName, fmt);
+			}
+		}
+
+
+
+		/// <summary>
+		/// 「表示画像をクリップボードにコピー」が選択されたときの処理です
+		/// </summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void 表示画像をクリップボードにコピーToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			if (pboxColImage.Image == null) return;
+			Clipboard.SetDataObject(pboxColImage.Image);
+		}
+
+
+
+		/// <summary>「表示画像を画像情報画面で表示」が選択されたときの処理です</summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void 表示画像を画像情報画面で表示ToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			if (MessageBox.Show("表示部分以外の領域はトリミングされますが、よろしいですか？", "確認", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) == System.Windows.Forms.DialogResult.OK)
+			{
+				var str = FormColorImageS.CreateDispInfoString(0, 0, 1.0f, _scalePbox.BasePbox.Width, _scalePbox.BasePbox.Height);
+				var frm = new FormColorImageS((Bitmap)pboxColImage.Image, this.Text + "(Copy)", false, -1, -1, str, _settings, this.Icon );
+				frm.Show();
+			}
+		}
+
+		/// <summary>「 元画像をファイルに保存」が選択されたときの処理です</summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void 元画像をファイルに保存ToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			if (_sourceImage == null) return;
+			SaveImageFile(_sourceImage);
+		}
+
+		/// <summary>「元画像をクリップボードにコピー」が選択されたときの処理です</summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void 元画像をクリップボードにコピーToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			if (_sourceImage == null) return;
+			Clipboard.SetDataObject(_sourceImage);
+
+		}
+
+		/// <summary>「元画像を画像情報画面で表示」が選択されたときの処理です</summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void 元画像を画像情報画面で表示ToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			if (_sourceImage == null) return;
+			var rect = _scalePbox.GetDispRect();
+			var str = FormColorImageS.CreateDispInfoString(rect.X, rect.Y, _scalePbox.DispRate, _scalePbox.BasePbox.Width, _scalePbox.BasePbox.Height);
+			var frm = new FormColorImageS(_sourceImage, this.Text + "(Copy)", false, -1, -1, str, _settings, this.Icon);
+			frm.Show();
+		}
+
+
+		/// <summary>キーアップ時に呼び出されます</summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void FormColorImageS_KeyUp(object sender, KeyEventArgs e)
+		{
+			if (_isHitAnyKey == true)
+			{
+				Close();
+			}
+
+			// コントロールキーのアップ時、もしプロファイルモードであれば(隠れている）フォームを表示する
+			if ((e.KeyCode & Keys.ControlKey) == Keys.ControlKey )
+			{
+				if (_isProfModeLine != null)
+				{
+					if (_isProfModeLine == true)
+					{
+						if (_formProfViewerLine != null) _formProfViewerLine.Show();
+					}
+					else
+					{
+						if (_formProfViewerBoxH != null) _formProfViewerBoxH.Show();
+						if (_formProfViewerBoxV != null) _formProfViewerBoxV.Show();
+					}
+				}
+
+				// 移動モードであればキャンセル
+				_isProfPosMovAll = null;
+
+			}
+		}
+
+
+		// =====　表示情報文字列  =====
+		// BasePosX		原点位置の元画像座標(x位置)		int
+		// BasePosY		原点位置の元画像座標(y位置)		int
+		// Rate			表示拡大率						float
+		// Width		表示枠　幅						int
+		// Height		表示枠　高さ					int		
+		//  -- option
+		// IsProfModeLine プロファイルラインモード		bool
+		// ProfPosB			プロファイルモード開始点		Point
+		// ProfPosE			プロファイルモード終了点		Point
+	
+
+
+
+		/// <summary>表示情報文字列を生成します（必須項目のみ）</summary>
+		/// <param name="xx">原点位置の元画像座標(x位置)</param>
+		/// <param name="yy">原点位置の元画像座標(y位置)</param>
+		/// <param name="rate">表示拡大率</param>
+		/// <param name="width">表示枠（幅）</param>
+		/// <param name="height">表示枠（高さ）</param>
+		/// <returns>生成した表示情報文字列</returns>
+		/// <remarks>FormColorImageS独自フォーマット</remarks>
+		static public string CreateDispInfoString(int xx, int yy, float rate, int width, int height)
+		{
+			var sList = new List<string>();
+			sList.Add("表示情報文字列");
+			// 必須
+			sList.Add("BasePosX" + PP_PluginConfigData.Keyword_Value + xx.ToString());
+			sList.Add("BasePosY" + PP_PluginConfigData.Keyword_Value + yy.ToString());
+			sList.Add("Rate" + PP_PluginConfigData.Keyword_Value + rate.ToString());
+			sList.Add("Width" + PP_PluginConfigData.Keyword_Value + width.ToString());
+			sList.Add("Height" + PP_PluginConfigData.Keyword_Value + height.ToString());
+			return String.Join(PP_PluginConfigData.Keyword_Item, sList);
+		}
+
+
+		/// <summary>表示情報文字列を生成します（オプション項目含む）</summary>
+		/// <param name="xx">原点位置の元画像座標(x位置)</param>
+		/// <param name="yy">原点位置の元画像座標(y位置)</param>
+		/// <param name="rate">表示拡大率</param>
+		/// <param name="width">表示枠（幅）</param>
+		/// <param name="height">表示枠（高さ）</param>
+		/// <param name="isProfModeLine">プロファイルモード</param>
+		/// <param name="profPosB">プロファイルモード時開始点</param>
+		/// <param name="profPosE">プロファイルモード時終了点</param>
+		/// <returns>生成した表示情報文字列</returns>
+		/// <remarks>FormColorImageS独自フォーマット（オプション含む）</remarks>
+		static public string CreateDispInfoStringEx(int xx, int yy, float rate, int width, int height, bool? isProfModeLine, Point? profPosB, Point? profPosE )
+		{
+			var sList = new List<string>();
+			sList.Add("表示情報文字列");
+			// 必須
+			sList.Add("BasePosX" + PP_PluginConfigData.Keyword_Value + xx.ToString());
+			sList.Add("BasePosY" + PP_PluginConfigData.Keyword_Value + yy.ToString());
+			sList.Add("Rate" + PP_PluginConfigData.Keyword_Value + rate.ToString());
+			sList.Add("Width" + PP_PluginConfigData.Keyword_Value + width.ToString());
+			sList.Add("Height" + PP_PluginConfigData.Keyword_Value + height.ToString());
+			// オプション
+			if (isProfModeLine != null) sList.Add("IsProfModeLine" + PP_PluginConfigData.Keyword_Value + isProfModeLine.Value.ToString());
+			if (profPosB != null) sList.Add("ProfPosB" + PP_PluginConfigData.Keyword_Value + profPosB.Value.ToString());
+			if (profPosE != null) sList.Add("ProfPosE" + PP_PluginConfigData.Keyword_Value + profPosE.Value.ToString());
+			// オプション
+			return String.Join(PP_PluginConfigData.Keyword_Item, sList);
+		}
+
+
+		/// <summary>表示情報をクリップボードへ書き込みます</summary>
+		/// <param name="xx">原点位置の元画像座標(x位置)</param>
+		/// <param name="yy">原点位置の元画像座標(y位置)</param>
+		/// <param name="rate">表示拡大率</param>
+		/// <param name="width">表示枠（幅）</param>
+		/// <param name="height">表示枠（高さ）</param>
+		/// <remarks>FormColorImageS独自フォーマット</remarks>
+		static public void DispInfoToClipBoard( int xx, int yy, float rate, int width, int height )
+		{
+			var info = CreateDispInfoString(xx, yy, rate, width, height);
+			Clipboard.SetDataObject(info,true);
+		}
+
+
+		/// <summary>表示情報をクリップボードへ書き込みます</summary>
+		/// <param name="xx">原点位置の元画像座標(x位置)</param>
+		/// <param name="yy">原点位置の元画像座標(y位置)</param>
+		/// <param name="rate">表示拡大率</param>
+		/// <param name="width">表示枠（幅）</param>
+		/// <param name="height">表示枠（高さ）</param>
+		/// <remarks>FormColorImageS独自フォーマット</remarks>
+		static public void DispInfoToClipBoardEx(int xx, int yy, float rate, int width, int height, bool? isProfModeLine, Point? profPosB, Point? profPosE)
+		{
+			var info = CreateDispInfoStringEx(xx, yy, rate, width, height, isProfModeLine, profPosB, profPosE);
+			Clipboard.SetDataObject(info, true);
+		}
+
+		/// <summary>表示情報文字列をパースし、必須情報を取得します</summary>
+		/// <param name="str">表示情報文字列（FormColorImageS独自フォーマット）</param>
+		/// <param name="xx">原点位置の元画像座標(x位置)</param>
+		/// <param name="yy">原点位置の元画像座標(y位置)</param>
+		/// <param name="rate">表示拡大率</param>
+		/// <param name="width">表示枠（幅）</param>
+		/// <param name="height">表示枠（高さ）</param>
+		/// <param name="dic">辞書</param>
+		/// <returns>成否</returns>
+		static public bool ParseDispInfoString( string str, out int xx, out int yy, out float rate, out int width, out int height, out Dictionary<string,string>dic)
+		{
+			dic = null;
+			xx = yy = width = height = int.MinValue;
+			rate = 0.0f;
+			if (String.IsNullOrEmpty(str)) return false;
+			string ww;
+			dic = PP_PluginConfigData.ConfigStringToDictionary(str, out ww);
+			if (dic == null) return false;
+
+			string wStr = "";
+			int wInt = 0;
+			float wFlg = 0.0f;
+
+			// BasePosX		原点位置の元画像座標(x位置)		int
+			if ((dic.TryGetValue("BasePosX", out wStr) && int.TryParse(wStr, out wInt)) == true) xx = wInt;
+
+			// BasePosY		原点位置の元画像座標(y位置)		int
+			if ((dic.TryGetValue("BasePosY", out wStr) && int.TryParse(wStr, out wInt)) == true) yy = wInt;
+
+			// Rate			表示拡大率						float
+			if ((dic.TryGetValue("Rate", out wStr) && float.TryParse(wStr, out wFlg)) == true) rate = wFlg;
+
+			// Width		表示枠　幅						int
+			if ((dic.TryGetValue("Width", out wStr) && int.TryParse(wStr, out wInt)) == true) width = wInt;
+
+			// Height		表示枠　高さ					int							
+			if ((dic.TryGetValue("Height", out wStr) && int.TryParse(wStr, out wInt)) == true) height = wInt;
+
+			// 必須項目がひとつでも設定されていなければエラーとする
+			return true;
+		}
+
+
+		/// <summary>
+		/// 文字列(ToString()により変換された）をPoint構造体にパースします</summary>
+		/// <param name="str">PointインスタンスをToString()により変換された文字列</param>
+		/// <returns>パース成否</returns>
+		static bool ParsePoint(string str, out Point pos)
+		{
+			pos = new Point();
+			var _regParsePoint = new Regex(@"X=(?<X>[\+\-\d]+),[ ]*Y=(?<Y>[\+\-\d]+)");
+
+			try
+			{
+				var m = _regParsePoint.Match(str);
+				if (m.Success)
+				{
+					var txstr = m.Groups["X"].Value;
+					var tystr = m.Groups["Y"].Value;
+					int ww;
+					if (int.TryParse(txstr, out ww) == false) return false;
+					pos.X = ww;
+					if (int.TryParse(tystr, out ww) == false) return false;
+					pos.Y = ww;
+					return true;
+				}
+				return false;
+			}
+			catch
+			{
+				return false;
+			}
+		}
+
+
+
+		/// <summary>クリップボードに書き込まれた表示情報を取得します</summary>
+		/// <param name="xx">原点位置の元画像座標(x位置)</param>
+		/// <param name="yy">原点位置の元画像座標(y位置)</param>
+		/// <param name="rate">表示拡大率</param>
+		/// <param name="width">表示枠（幅）</param>
+		/// <param name="height">表示枠（高さ）</param>
+		/// <returns>成否</returns>
+		/// <remarks>FormColorImageS独自フォーマット</remarks>
+		static public bool DispInfoFromClipBoard(out int xx, out int yy, out float rate, out int width, out int height, out Dictionary<string,string>dic)
+		{
+			// クリップボードから（テキスト）データを取得。
+			IDataObject data = Clipboard.GetDataObject();
+			string str = "";
+			xx = yy = width = height = -1;
+			rate = 0.0f;
+			dic = null;
+			if (data.GetDataPresent(DataFormats.Text))
+			{
+				str = (string)data.GetData(DataFormats.Text);
+				return ParseDispInfoString(str, out xx, out yy, out rate, out width, out height, out dic);
+			}
+			// エラー
+			return false;
+		}
+
+
+
+		/// <summary>「表示情報をクリップボードへ」が選択されたときの処理です</summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void 表示情報をクリップボードへToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			var rect = _scalePbox.GetDispRect();
+			DispInfoToClipBoardEx( rect.X, rect.Y, _scalePbox.DispRate, _scalePbox.BasePbox.Width, _scalePbox.BasePbox.Height, _isProfModeLine, _measureModePointB, _measureModePointE);
+		}
+
+
+
+		/// <summary>表示情報に従い、画面表示を調整します</summary>
+		/// <param name="xx">原点位置の元画像座標(x位置)</param>
+		/// <param name="yy">原点位置の元画像座標(y位置)</param>
+		/// <param name="rate">表示拡大率</param>
+		/// <param name="width">表示枠（幅）</param>
+		/// <param name="height">表示枠（高さ）</param>
+		/// <returns>成否</returns>
+		private bool AdjustFromDispInfo(int xx, int yy, float rate, int width, int height)
+		{
+			// まず、ウィンドウの大きさを合わせる
+			var newWidth = this.Width + width - _scalePbox.BasePbox.Width;
+			var newHeight = this.Height + height - _scalePbox.BasePbox.Height;
+			if (newWidth <= 10 || newHeight <= 10 || rate < 0.01 || rate > 1000.0)
+			{
+				MessageBox.Show(String.Format("不適当な表示情報であるため、無視します  newWidth={0}, newHeight={1}", newWidth, newHeight), "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				return false;
+			}
+			this.Width = newWidth;
+			this.Height = newHeight;
+			_scalePbox.MoveDispPos(xx, yy, 0, 0, rate);		// 元画像の(tx,ty)を倍率rateで(0,0)から表示
+			_scalePbox.DrawMainImage();
+			return true;
+		}
+
+
+		/// <summary>「クリップボードの表示情報インポート」が選択されたときの処理です</summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void クリップボードの表示情報インポートToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			int tx, ty, width, height;
+			float rate;
+			Dictionary<string, string> dic;
+
+			// クリップボードから表示情報データを取得。
+			if( DispInfoFromClipBoard( out tx, out ty, out rate, out width, out height, out dic )== true )
+			{
+				// オプション項目の設定
+				AdjustOptionFromDic(dic);
+
+				// 取得した情報に合わせて、画面や表示状態を調整する。（必須項目）
+				AdjustFromDispInfo(tx, ty, rate, width, height);
+
+				// 再描画
+				_scalePbox.DrawMainImage();
+
+				// オプション項目の設定（※）
+				// 原因は判明していないが、先頭で行ったこの処理をここで再度実行しないとオプション（プロファイル）の情報が空で表示される。
+				AdjustOptionFromDic(dic);
+	
+				Refresh();
+			}
+			else
+			{
+				MessageBox.Show("不適当な表示情報であるため、無視します", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				return;
+			}
+		}
+
+
+		/// <summary>
+		/// オプション項目の設定を行います</summary>
+		/// <param name="dic">辞書</param>
+		private void AdjustOptionFromDic( Dictionary<string,string>dic)
+		{
+			string wStr;
+			bool wBool= false;
+			var wPos= new Point();
+			if ((dic.TryGetValue("IsProfModeLine", out wStr) && bool.TryParse(wStr, out wBool)) == true)
+			{
+				_isProfModeLine = wBool;
+				if ((dic.TryGetValue("ProfPosB", out wStr) && ParsePoint(wStr, out wPos)) == true) _measureModePointB = wPos;
+				if ((dic.TryGetValue("ProfPosE", out wStr) && ParsePoint(wStr, out wPos)) == true) _measureModePointE = wPos;
+				if (_isProfModeLine == true)	rbtnProfModeLine.Checked = true;
+				else							rbtnProfModeBox.Checked = true;
+			}
+			else
+			{
+				_isProfModeLine = null;
+				_measureModePointB = null;
+				_measureModePointE = null;
+				rbtnProfModeOff.Checked = true;
+			}
+
+
+		}
+
+
+		/// <summary>クローズ時の処理です</summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void FormColorImageS_FormClosed(object sender, FormClosedEventArgs e)
+		{
+			if (_sourceImage != null)
+			{
+				_sourceImage.Dispose();
+				_sourceImage = null;
+			}
+
+			DeleteProfileForm();
+			
+			// 終了時アクションが指定されていれば呼び出す。
+			if (_actOnClosed != null) _actOnClosed();
+		}
+
+		/// <summary>「Fit」が指定されたときの処理です</summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void fitToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			// 全面フィット
+			FitImage();
+		}
+
+		/// <summary>「等倍100%」が指定されたときの処理です</summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void 等倍100ToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			_scalePbox.SetRate(1.00f);
+		}
+
+		/// <summary>「倍率指定」が指定されたときの処理です</summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void 指定倍率ToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			var frm = new SetingsRateForm(_scalePbox.DispRate );
+			var ret = frm.ShowDialog();
+			if (ret == System.Windows.Forms.DialogResult.OK)
+			{
+				_scalePbox.SetRate(frm.Rate);
+				_scalePbox.DrawMainImage();
+				AdjustPictureBoxSize();
+			}
+		}
+
+
+		/// <summary>ピクチャーボックスサイズを調整し,余白を除きます</summary>
+		private void AdjustPictureBoxSize()
+		{
+			// 余白を取得
+			int sT, sB, sL, sR;
+			_scalePbox.GetSpeceSize(out sT, out sL, out sB, out sR);
+
+			// 必要があれば原点移動する。
+			if (sT > 0 || sL > 0)
+			{
+				var rect = _scalePbox.GetDispRect();
+				int xx = sL > 0 ? rect.X : 0;
+				int yy = sT > 0 ? rect.Y : 0;
+				_scalePbox.MoveDispPos(0, 0, xx, yy);
+			}
+			this.Width -= sL + sR;
+			this.Height -= sT + sB;
+		}
+
+
+		/// <summary>「余白の削除」が指定されたときの処理です</summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void 余白の削除ToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			AdjustPictureBoxSize();
+		}
+
+		/// <summary>
+		/// ピクチャーボックスのサイズが変更されたときのイベント処理です。表示情報等の変更
+		/// </summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void pboxColImage_Resize(object sender, EventArgs e)
+		{
+			labelDispInfo.Text = String.Format("[ {0} x {1} ]", pboxColImage.Width, pboxColImage.Height);
+		}
+
+
+		/// <summary>
+		/// 表示情報文字列コンテキストメニュー「表示サイズ指定」が指定されたときの処理です
+		/// </summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void 表示サイズ指定ToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			try
+			{
+				//現在フォームが存在しているディスプレイを取得し、指定可能な最大サイズとする
+				var s = Screen.FromControl(this);
+				//ディスプレイの高さと幅を取得
+				int maxh = s.Bounds.Height;
+				int maxw = s.Bounds.Width;
+
+				var frm = new SettingSizeForm(pboxColImage.Width, pboxColImage.Height, maxw, maxh);
+				if (frm.ShowDialog() != DialogResult.OK) return;
+
+				// ウィンドウの大きさを合わせる
+				var newWidth = this.Width + frm.Width - _scalePbox.BasePbox.Width;
+				var newHeight = this.Height + frm.Height - _scalePbox.BasePbox.Height;
+				if (newWidth <= 10 || newHeight <= 10 || newWidth > maxw || newHeight > maxh)
+				{
+					MessageBox.Show(String.Format("不適当な表示情報であるため、無視します  newWidth={0}, newHeight={1}", newWidth, newHeight), "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+					return;
+				}
+				this.Width = newWidth;
+				this.Height = newHeight;
+				Refresh();
+			}
+			catch (Exception ex)
+			{
+				MessageBox.Show(String.Format( "例外が発生しました。　Message={0},  Stack={1}", ex.Message, ex.StackTrace ));
+			}
+		}
+
+
+		/// <summary>
+		/// 表示情報文字列コンテキストメニュー「FormClorImageS設定」が指定されたときの処理です
+		/// </summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void FormClorImageS設定ToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			var frm = new FormConfigurationData(_settings);
+			if (frm.ShowDialog() == DialogResult.OK && frm.Settings is ColImageSetteings)
+			{
+				_settings = (ColImageSetteings)frm.Settings;
+				OnChangeSettings();
+			}
+		}
+
+
+		/// <summary>
+		/// 設定が変更されたときの処理です
+		/// </summary>
+		private void OnChangeSettings()
+		{
+			_scalePbox.InterpolationMode = _settings.MainInterpolationMode;
+			_scalePbox.InterpolationModeReduce = _settings.MainInterpolationModeReduce;
+			_scalePbox.BasePbox.BackColor = _settings.BackColor;
+			_scalePbox.DrawMainImage();
+		}
+
+
+		/// <summary>
+		/// 「表示枠情報を別の画像情報画面に表示」が指定されたときの処理です
+		/// </summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void 表示枠情報を別の画像情報画面に表示ToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			if( _sourceImage== null ) return;
+			var bmp = _sourceImage.Clone(new Rectangle(0, 0, _sourceImage.Width, _sourceImage.Height), PixelFormat.Format24bppRgb);
+			using (var gra = Graphics.FromImage(bmp))
+			using (var pen = new Pen(Color.Red, 3.0f))
+			{
+				// 表示領域の太線はPenAlignmentは外側に太くする
+				pen.Alignment = PenAlignment.Outset;	
+				gra.DrawRectangle(pen, _scalePbox.GetDispRect());
+			}
+			var frm = new FormColorImageS(bmp, this.Text + "表示領域", false, -1, -1, null, _settings);
+			frm.Show();
+
+		}
+
+
+		/// <summary>
+		/// フォームペイント時の処理です</summary>
+		/// <param name="sender">送信元</param>
+		/// <param name="e">イベント情報</param>
+		private void FormColorImageS_Paint(object sender, PaintEventArgs e)
+		{
+			// その他
+			var str = "";
+			if (_measureModePointB != null)
+			{
+				var bx = _measureModePointB.Value.X;
+				var by = _measureModePointB.Value.Y;
+				if (_measureModePointE != null)
+				{
+					// PEND　描画あとで
+					//////var ex = _measureModePointE.Value.X;
+					//////var ey = _measureModePointE.Value.Y;
+
+					//////// 単位変換不要な場合（ピクセルサイズ指定なしとありの場合
+					//////var pixSize = CommonValues.ConfigData.PixelSize;
+					//////var pixUnit = CommonValues.ConfigData.PixelSizeUnit;
+					//////var len = Math.Sqrt((bx - ex) * (bx - ex) + (by - ey) * (by - ey));
+					//////if (pixSize == 1.0 && String.IsNullOrEmpty(pixUnit))
+					//////{
+					//////    str = string.Format("({0},{1}) - ({2},{3})  距離:{4} pixcel", bx.ToString().PadLeft(4), by.ToString().PadLeft(4), ex.ToString().PadLeft(4), ey.ToString().PadLeft(4), len.ToString("##0.000").PadLeft(9));
+
+					//////}
+					//////else
+					//////{
+					//////    var lenPstr = (len * pixSize).ToString();
+					//////    str = string.Format("({0},{1}) - ({2},{3})  距離:{4} pixcel　{5} {6}", bx.ToString().PadLeft(4), by.ToString().PadLeft(4), ex.ToString().PadLeft(4), ey.ToString().PadLeft(4), Math.Sqrt((bx - ex) * (bx - ex) + (by - ey) * (by - ey)).ToString("##0.000").PadLeft(9), lenPstr.Length > 7 ? lenPstr.Substring(0, 7) : lenPstr, pixUnit == null ? "" : pixUnit);
+					//////}
+				}
+				else
+				{
+					str = string.Format("({0},{1})", bx.ToString().PadLeft(4), by.ToString().PadLeft(4));
+				}
+			}
+
+
+		}
+
+
+
+		/// <summary>ScalablePboxからの描画時コールバック処理です。 </summary>
+		/// <param name="gra">描画対象Grahics</param>
+		/// <param name="siz">画像サイズ</param>
+		private void OnPaintPbox(Graphics gra, Size siz)
+		{
+			// 距離測定用のカーソル表示
+			DispMeasureMode(gra);
+
+			// プロファイルフォーム生成・描画
+			CreateProfileForm(false);  
+		}
+
+
+		/// <summar>計測モード時の描画を行います</summary>
+		private void DispMeasureMode(Graphics g)
+		{
+			var profVisible = false;
+			try
+			{
+				g.SmoothingMode = SmoothingMode.AntiAlias;
+				var mat = _scalePbox.Mat.Clone();
+				// 十字カーソルのサイズは固定で10pixel（表示座標上）
+				float sizeCursol = (_scalePbox.DispRate < 1.0) ? (float)Math.Ceiling(10.0 / _scalePbox.DispRate) : 10.0f;
+				float widLine = (_scalePbox.DispRate < 1.0) ? (float)Math.Ceiling(2.0 / _scalePbox.DispRate) : 2.0f;
+				float widCursor = (_scalePbox.DispRate < 1.0) ? (float)Math.Ceiling(1.0 / _scalePbox.DispRate) : 1.0f;
+
+				// データがなしの場合やプロファイルモードでない場合には何もしない。
+
+				// PointBが定義されている
+				if (_measureModePointB != null)
+				{
+					var poBv = (Point)_measureModePointB.Value;
+					if (_measureModePointE == null)
+					{
+						CrossCursor(g, (Point)_measureModePointB.Value, sizeCursol, Color.Red, widCursor);
+						tboxProfInfo.Text = String.Format("({0,4},{1,4} ) - ", _measureModePointB.Value.X, _measureModePointB.Value.Y);
+					}
+					else
+					{
+						var pB = _measureModePointB.Value;
+						var pE = _measureModePointE.Value;
+						var poEv = new Point[] { _measureModePointE.Value };
+						CrossCursor(g, pB, sizeCursol, Color.Red, widCursor);
+						CrossCursor(g, pE, sizeCursol, Color.Yellow, widCursor);
+						DispMeasureCursor(g, pB, pE, Color.Yellow, widLine, _isProfModeLine.Value);
+						tboxProfInfo.Text = String.Format("({0,4},{1,4} ) - ({2,4},{3,4} ) ", pB.X, pB.Y, pE.X, pE.Y);
+						// ラインの場合には2点の距離を、ボックス時は2点の差分を表示する
+						labelProfSize.Text = _isProfModeLine.Value == true ? String.Format("{0:#0.00}", UtilityGraphics.CalcDistance(pB, pE)) : String.Format("({0}, {1})", pE.X - pB.X, pE.Y - pB.Y);
+					}
+					profVisible = true;
+				}
+			}
+			finally
+			{
+				tboxProfInfo.Visible =　labelProfSize.Visible = profVisible;
+			}
+		}
+
+
+
+
+
+		/// <summary>
+		/// 十字カーソルを表示します
+		/// </summary>
+		/// <param name="po">中心座標</param>
+		/// <param name="siz">大きさ</param>
+		/// <param name="col">色</param>
+		/// <param name="wid">線の幅</param>
+		/// <param name="g">Graphics</param>
+		private void CrossCursor(Graphics g, Point po, float siz, Color col, float wid)
+		{
+			g.DrawLine(new Pen(col, wid), po.X - siz / 2.0f, po.Y, po.X + siz / 2, po.Y);
+			g.DrawLine(new Pen(col, wid), po.X, po.Y - siz / 2.0f, po.X, po.Y + siz / 2.0f);
+		}
+
+
+
+
+
+		/// <summary>計測モード・計測ラインの表示</summary>
+		/// <param name="g">グラフィックス</param>
+		/// <param name="pob">開始位置</param>
+		/// <param name="poe">終了位置</param>
+		/// <param name="col">色</param>
+		/// <param name="wid">線の幅</param>
+		/// <param name="isLine">true:ライン false:ボックス</param>
+		private void DispMeasureCursor(Graphics g, Point pob, Point poe, Color col, float wid, bool isLine)
+		{
+			Pen pen = new Pen(col, wid);
+			pen.StartCap = pen.EndCap = LineCap.ArrowAnchor;
+
+			// モードによりLineまたはRectangleを描画する
+			if (isLine)
+			{
+				g.DrawLine(pen, pob, poe);
+				if (_pcLine != null)
+				{
+					var xx = (double)(poe.X - pob.X);
+					var yy = (double)(poe.Y - pob.Y);
+					var ww = Math.Sqrt(xx * xx + yy * yy);
+					xx /= ww;
+					yy /= ww;
+					var ss = 4f;
+					var rr = new RectangleF( pob.X + (float)(xx * _pcLine.Value) - ss , pob.Y + (float)(yy * _pcLine.Value) -ss, ss*2, ss*2 );
+					g.FillRectangle(Brushes.Orange, rr); 
+
+				}
+			}
+			else
+			{
+				var penC = new Pen(Color.Orange, wid);
+				var rect = CreateRectFromMeasurePoint(pob, poe);
+				g.DrawRectangle(pen, rect);
+				if (_pcBoxH != null) g.DrawLine(penC, rect.X + _pcBoxH.Value, rect.Y, rect.X + _pcBoxH.Value, rect.Y + rect.Height);
+				if (_pcBoxV != null) g.DrawLine(penC, rect.X, rect.Y + _pcBoxV.Value, rect.X + rect.Width, rect.Y + _pcBoxV.Value);
+			}
+		}
+
+
+		/// <summary>
+		/// プロファイルモードのラジオボタンの変更時の処理です</summary>
+		/// <param name="sender">送信元</param>
+		/// <param name="e">イベント情報</param>
+		private void OnChangeProfileMode(object sender, EventArgs e)
+		{
+			var rbtn = sender as RadioButton;
+			if (rbtn == null|| rbtn.Checked== false ) return;
+
+			var oldProfMode = _isProfModeLine;
+			SetProfileMode();
+
+			// 計測モード、PointB,Eをクリアし、プロファイル用フォームが開いていれば破棄する
+			ClearMeasureMode();
+			DeleteProfileForm();
+
+			if (_isProfModeLine == null)
+			{
+				_scalePbox.DrawMainImage();
+			}
+			else
+			{
+				// プロファイルモードに従い、フォームを生成する
+				CreateProfileForm(true);
+			}
+		}
+
+
+		/// <summary>
+		/// プロファイルモードをセットします</summary>
+		/// <remarks>ラジオボタンの状態→メンバ_isProfileMode</remarks>
+		private void SetProfileMode()
+		{
+			if (rbtnProfModeOff.Checked)		_isProfModeLine = null;
+			else if (rbtnProfModeLine.Checked)	_isProfModeLine = true;
+			else								_isProfModeLine = false;
+		}
+
+
+		/// <summary>
+		/// MesureMode（ProfMode時のCtrl状態）をクリアします</summary>
+		private void ClearMeasureMode()
+		{
+			// 計測モード、PointB,Eをクリア
+			_isMeasureMode = false;
+			_measureModePointB = _measureModePointE = null;
+
+			_isProfPosMovAll = null;
+
+			DeleteProfileForm();
+		}
+
+
+		/// <summary>
+		/// プロファイル用フォームを削除します</summary>
+		private void DeleteProfileForm()
+		{
+			// nullでないプロファイル用フォームがあれば、破棄
+			if (_formProfViewerLine != null)
+			{
+				_formProfViewerLine.IsIgnoreClose = false;
+				_formProfViewerLine.Dispose();
+				_formProfViewerLine = null;
+			}
+			if (_formProfViewerBoxH != null)
+			{
+				_formProfViewerBoxH.IsIgnoreClose = false;
+				_formProfViewerBoxH.Dispose();
+				_formProfViewerBoxH = null;
+			}
+			if (_formProfViewerBoxV != null)
+			{
+				_formProfViewerBoxV.IsIgnoreClose = false;
+				_formProfViewerBoxV.Dispose();
+				_formProfViewerBoxV = null;
+			}
+			_pcLine = _pcBoxH = _pcBoxV = null;
+		}
+
+
+		/// <summary>
+		/// 平均色を求めます</summary>
+		/// <param name="cols">色情報群</param>
+		/// <returns>平均色</returns>
+		private Color AverageColor(Color[] cols)
+		{
+			int tR = 0;
+			int tG = 0;
+			int tB = 0;
+			foreach (var c in cols)
+			{
+				tR += c.R;
+				tG += c.G;
+				tB += c.B;
+			}
+			return Color.FromArgb((int)((double)tR / cols.Length + 0.5), (int)((double)tG / cols.Length + 0.5), (int)((double)tB / cols.Length + 0.5));
+		}
+
+		/// <summary>
+		/// 平均色を求め、RGBを示す文字列に変換します</summary>
+		/// <param name="cols">色情報群</param>
+		/// <returns>平均色文字列 (R,G,B)</returns>
+		private string AverageColorString(Color[] cols)
+		{
+			var c = AverageColor(cols);
+			return $"[{c.R.ToString().PadLeft(3)},{c.G.ToString().PadLeft(3)},{c.B.ToString().PadLeft(3)}]";
+		}
+
+		/// <summary>
+		/// プロファイルモードに従い、プロファイル用フォームを生成します</summary>
+		/// <param name="isForce">すでに存在する場合、強制的にShowを実施する</param>
+		private void CreateProfileForm(bool isForce )
+		{
+			// カーソルクリア
+			_pcLine = _pcBoxH = _pcBoxV = null;
+
+			if (_isProfModeLine == null) 
+			{
+				labelAverageColor.Text = "";
+				return;
+			}
+
+			if (  _isProfModeLine.Value == true )
+			{
+				double distance;
+				var pData = CalcLineProfile( out distance );
+				if (_formProfViewerLine == null)
+				{
+					_formProfViewerLine = new FormProfileViewer(pData, "ラインプロファイル", null, distance, this.Icon, new Action<double>((dist)=> { _pcLine = dist; _scalePbox.DrawMainImage(); }) );
+					_formProfViewerLine.Show();
+				}
+				else{
+					_formProfViewerLine.SetData(pData, distance);
+					if (isForce)_formProfViewerLine.Show();
+				}
+				// データがあれば平均値を表示（なければクリア）
+				labelAverageColor.Text = (pData != null && pData.Any()) ? $"平均色 {AverageColorString(pData)}" : "";
+			}
+
+			if (_isProfModeLine.Value == false)
+			{
+				var pDataH = CalcBoxHProfile();
+				if (_formProfViewerBoxH == null)
+				{
+					_formProfViewerBoxH = new FormProfileViewer(pDataH, "水平プロファイル", null, 0.0, this.Icon, new Action<double>((xofs) => { _pcBoxH = (int)Math.Round(xofs); _scalePbox.DrawMainImage(); }));
+					_formProfViewerBoxH.Show();
+				}
+				else
+				{
+					_formProfViewerBoxH.SetData(pDataH, 0.0);
+					if (isForce) _formProfViewerBoxH.Show();
+				}
+
+				var pDataV = CalcBoxVProfile();
+				if (_formProfViewerBoxV == null)
+				{
+					_formProfViewerBoxV = new FormProfileViewer(pDataV, "垂直プロファイル", null, 0.0, this.Icon, new Action<double>((yofs) => { _pcBoxV = (int)Math.Round(yofs); _scalePbox.DrawMainImage(); }));
+					_formProfViewerBoxV.Show();
+				}
+				else
+				{
+					_formProfViewerBoxV.SetData(pDataV, 0.0);
+					if (isForce) _formProfViewerBoxV.Show();
+				}
+
+				var pData = GetBoxProfile();
+				// データがあれば平均値を表示（なければクリア）
+				labelAverageColor.Text = (pData != null && pData.Any()) ? $"平均色 {AverageColorString(pData)}" : "";
+
+			}
+
+		}
+
+
+		/// <summary>計測モード群の状態から、ラインプロファイルの計算を行います</summary>
+		/// <returns>ラインプロファイル値</returns>
+		private Color[] CalcLineProfile(out double distance)
+		{
+			distance = 0;
+			if (_measureModePointB == null || _measureModePointE == null) return null;
+			var bx = _measureModePointB.Value.X;
+			var by = _measureModePointB.Value.Y;
+			var ex = _measureModePointE.Value.X;
+			var ey = _measureModePointE.Value.Y;
+			distance = Math.Sqrt((bx - ex) * (bx - ex) + (by - ey) * (by - ey));
+			return GetLinePixels(_sourceImage, bx, by, ex, ey);
+		}
+
+
+		/// <summary>計測モード群の状態から、ボックスプロファイル(H)の計算を行います</summary>
+		/// <returns>ボックスプロファイル(H)値</returns>
+		private Color[] CalcBoxHProfile()
+		{
+			if (_measureModePointB == null || _measureModePointE == null) return null;
+			var rect = CreateRectFromMeasurePoint(_measureModePointB.Value, _measureModePointE.Value);
+			return GetProfileColorsH(_sourceImage, rect);
+		}
+
+
+		/// <summary>計測モード群の状態から、ボックスプロファイル(V)の計算を行います</summary>
+		/// <returns>ボックスプロファイル(V)値</returns>
+		private Color[] CalcBoxVProfile()
+		{
+			if (_measureModePointB == null || _measureModePointE == null) return null;
+			var rect = CreateRectFromMeasurePoint(_measureModePointB.Value, _measureModePointE.Value);
+			return GetProfileColorsV(_sourceImage, rect);
+		}
+
+		/// <summary>計測モード群の状態から、ボックスプロファイルを取得します</summary>
+		/// <returns>ボックスプロファイル値（ボックス内全ピクセル）</returns>
+		private Color[] GetBoxProfile()
+		{
+			if (_measureModePointB == null || _measureModePointE == null) return null;
+			var rect = CreateRectFromMeasurePoint(_measureModePointB.Value, _measureModePointE.Value);
+			return GetBoxPixels(_sourceImage, rect);
+		}
+
+
+		/// <summary>
+		/// 画像内から矩形（水平方向の情報、縦に平均を取る）水平プロファイルを取得します</summary>
+		/// <param name="bmp">ビットマップ</param>
+		/// <param name="rect">矩形</param>
+		/// <returns>水平プロファイル</returns>
+		private unsafe Color[] GetProfileColorsH(Bitmap bmp, Rectangle rect)
+		{
+			try
+			{
+				var ret = new Color[rect.Width];
+				var wrk = new int[rect.Width, 3];
+
+				var bmpData = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height), ImageLockMode.ReadOnly, bmp.PixelFormat);
+				try
+				{
+					var bmpScan0 = (byte*)bmpData.Scan0;
+					var bmpStride = bmpData.Stride;
+
+					// 座標群からそれぞれの位置の色を加算する
+					for (int ixx = 0; ixx < rect.Width; ixx++)
+					{
+						var xx = rect.X + ixx;
+						for (int iyy = 0; iyy < rect.Height; iyy++)
+						{
+							var yy = rect.Y + iyy;
+							var sp = bmpScan0 + yy * bmpStride + xx * 3;
+							wrk[ixx, 0] += sp[0];
+							wrk[ixx, 1] += sp[1];
+							wrk[ixx, 2] += sp[2];
+						}
+						var b= (int) Math.Round(((double)wrk[ixx, 0] / rect.Height), MidpointRounding.AwayFromZero);
+						var g = (int)Math.Round(((double)wrk[ixx, 1] / rect.Height), MidpointRounding.AwayFromZero);
+						var r = (int)Math.Round(((double)wrk[ixx, 2] / rect.Height), MidpointRounding.AwayFromZero);
+						ret[ixx] = Color.FromArgb(r, g, b);
+					}
+					return ret;
+				}
+				catch (Exception e)
+				{
+					throw e;
+				}
+				finally
+				{
+					bmp.UnlockBits(bmpData);
+				}
+			}
+			catch( Exception ex )
+			{
+				MessageBox.Show(String.Format("例外 Message={0}, Stack={1}", ex.Message, ex.StackTrace));
+				return null;		// エラー
+			}
+		}
+
+
+
+		/// <summary>
+		/// 画像内から矩形（垂直方向の情報、横に平均を取る）垂直プロファイルを取得します</summary>
+		/// <param name="bmp">ビットマップ</param>
+		/// <param name="rect">矩形</param>
+		/// <returns>垂直プロファイル</returns>
+		private unsafe Color[] GetProfileColorsV(Bitmap bmp, Rectangle rect)
+		{
+			try
+			{
+				var ret = new Color[rect.Height];
+				var wrk = new int[rect.Height, 3];
+
+				var bmpData = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height), ImageLockMode.ReadOnly, bmp.PixelFormat);
+				try
+				{
+					var bmpScan0 = (byte*)bmpData.Scan0;
+					var bmpStride = bmpData.Stride;
+
+					// 座標群からそれぞれの位置の色を加算する
+					for (int iyy = 0; iyy < rect.Height; iyy++)
+					{
+						var yy = rect.Y + iyy;
+						for (int ixx = 0; ixx < rect.Width; ixx++)
+						{
+							var xx = rect.X + ixx;
+							var sp = bmpScan0 + yy * bmpStride + xx * 3;
+							wrk[iyy, 0] += sp[0];
+							wrk[iyy, 1] += sp[1];
+							wrk[iyy, 2] += sp[2];
+						}
+						var b = (int)Math.Round(((double)wrk[iyy, 0] / rect.Width), MidpointRounding.AwayFromZero);
+						var g = (int)Math.Round(((double)wrk[iyy, 1] / rect.Width), MidpointRounding.AwayFromZero);
+						var r = (int)Math.Round(((double)wrk[iyy, 2] / rect.Width), MidpointRounding.AwayFromZero);
+						ret[iyy] = Color.FromArgb(r, g, b);
+					}
+					return ret;
+				}
+				catch (Exception e)
+				{
+					throw e;
+				}
+				finally
+				{
+					bmp.UnlockBits(bmpData);
+				}
+			}
+			catch
+			{
+				return null;		// エラー
+			}
+		}
+
+
+		/// <summary>画像内から矩形内の点（ピクセル情報）群を抽出します</summary>
+		/// <param name="bmp">ビットマップ</param>
+		/// <param name="bx">開始点 X</param>
+		/// <param name="by">開始点 Y</param>
+		/// <param name="ex">終了点 X</param>
+		/// <param name="ey">終了点 Y</param>
+		/// <returns>抽出したピクセル群。エラーの場合 null</returns>
+		private unsafe Color[] GetBoxPixels(Bitmap bmp, int bx, int by, int ex, int ey)
+		{
+			try
+			{
+				// 矩形を作成
+				var rect = CreateRectFromMeasurePoint(bx, by, ex, ey);
+
+				var ret = new Color[rect.Width* rect.Height];
+				var cnt = 0;
+
+				var bmpData = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height), ImageLockMode.ReadOnly, bmp.PixelFormat);
+				try
+				{
+					var bmpScan0 = (byte*)bmpData.Scan0;
+					var bmpStride = bmpData.Stride;
+
+					// 座標群からそれぞれの位置のカラー群に変換する
+					for (int yy = 0; yy < rect.Height; yy++)
+					{
+						var sp = bmpScan0 + (yy + rect.Y) * bmpStride + rect.X * 3;
+						for (int xx = 0; xx < rect.Width; xx++)
+						{
+							ret[cnt++] = Color.FromArgb(sp[2], sp[1], sp[0]);			// sp・・B,G,Rの順
+							sp+= 3;
+						}
+					}
+
+					return ret;
+				}
+				catch (Exception e)
+				{
+					throw e;
+				}
+				finally
+				{
+					bmp.UnlockBits(bmpData);
+				}
+			}
+			catch
+			{
+				return null;		// エラー
+			}
+		}
+
+		/// <summary>画像内から矩形内の点（ピクセル情報）群を抽出します</summary>
+		/// <param name="bmp">ビットマップ</param>
+		/// <param name="rect">矩形</param>
+		/// <returns>抽出したピクセル群。エラーの場合 null</returns>
+		private unsafe Color[] GetBoxPixels(Bitmap bmp, Rectangle rect)
+		{
+			return GetBoxPixels(bmp, rect.X, rect.Y, rect.X + rect.Width - 1, rect.Y + rect.Height - 1);
+		}
+
+
+
+		/// <summary>画像内からラインが通過する点（ピクセル情報）群を抽出します</summary>
+		/// <param name="bmp">ビットマップ</param>
+		/// <param name="bx">開始点 X</param>
+		/// <param name="by">開始点 Y</param>
+		/// <param name="ex">終了点 X</param>
+		/// <param name="ey">終了点 Y</param>
+		/// <returns>抽出したピクセル群。エラーの場合 null</returns>
+		private unsafe Color[] GetLinePixels(Bitmap bmp, int bx, int by, int ex, int ey)
+		{
+			try
+			{
+				// 直線の通る点群を求める
+				var poss = CreatePossLine(bx, by, ex, ey);
+
+				var ret = new Color[poss.Length];
+
+				var bmpData = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height), ImageLockMode.ReadOnly, bmp.PixelFormat);
+				try
+				{
+					var bmpScan0 = (byte*)bmpData.Scan0;
+					var bmpStride = bmpData.Stride;
+
+					// 座標群からそれぞれの位置のカラー群に変換する
+					return poss.Select(p =>
+						{
+							var sp = bmpScan0 + p.Y * bmpStride + p.X * 3;
+							return Color.FromArgb(sp[2], sp[1], sp[0]);			// sp・・B,G,Rの順
+						}).ToArray();
+				}
+				catch (Exception e)
+				{
+					throw e;
+				}
+				finally
+				{
+					bmp.UnlockBits(bmpData);
+				}
+			}
+			catch
+			{
+				return null;		// エラー
+			}
+		}
+
+
+
+
+		/// <summary>
+		/// 2点間を通るラインの座標群を生成します</summary>
+		/// <param name="bx">開始点 X</param>
+		/// <param name="by">開始点 Y</param>
+		/// <param name="ex">終了点 X</param>
+		/// <param name="ey">終了点 Y</param>
+		/// <returns>ライン座標群</returns>
+		private Point[] CreatePossLine(int bx, int by, int ex, int ey)
+		{
+			var list = new List<Point>();
+
+			if (bx == ex && by == ey) throw new Exception(String.Format("CreatePossLine()メソッドの引数は異なる2点である必要があります ({0},{1})", bx, by));
+
+			var stepX = (bx==ex)? 0: (ex-bx)/Math.Abs(ex-bx);
+			var stepY = (by==ey)? 0: (ey-by)/Math.Abs(ey-by);
+
+			// 2点を通る直線の式・パラメータを求めておく
+			double aa, bb, cc;			// 直線の一般式 aaX + bbY + cc = 0
+			GetParamAxByC( new Point( bx, by), new Point( ex, ey), out aa, out bb, out cc );
+	
+			//　変化量の大きい方を基準にして進める
+			if (Math.Abs(bx - ex) > Math.Abs(by - ey))
+			{
+				int yy;
+				for (int xx = bx; xx != ex; xx += stepX)
+				{
+					// Y= -(aaX + cc)/bb;
+					yy = (int)Math.Round(-(aa * xx + cc) / bb, MidpointRounding.AwayFromZero);		// 一般的な四捨五入。　第2引数がないと5を丸めるとき、偶数への丸めとなる
+					list.Add(new Point(xx, yy));
+				}
+			}
+			else
+			{
+				int xx;
+				for (int yy = by; yy != ey; yy += stepY)
+				{
+					// X= -(bbY + cc)/aa;
+					xx = (int)Math.Round(-(bb * yy + cc) / aa, MidpointRounding.AwayFromZero);		// 一般的な四捨五入。　第2引数がないと5を丸めるとき、偶数への丸めとなる
+					list.Add(new Point(xx, yy));
+				}
+			}
+			return list.ToArray();
+		}
+
+
+		/// <summary>
+		/// 2点を指定して直線の一般式 aX + bY + c = 0 のa,b,cパラメータを算出する
+		/// </summary>
+		/// <param name="p0"> 点0</param>
+		/// <param name="p1"> 点1</param>
+		/// <param name="a"> 算出パラメータ a　【out】 </param>
+		/// <param name="b"> 算出パラメータ b　【out】 </param>
+		/// <param name="c"> 算出パラメータ c　【out】 </param>
+		private void GetParamAxByC(Point p0, Point p1, out double a, out double b, out double c)
+		{
+			// 直線式 ax + by + c = 0として a,b,c決定
+			a = (double)p1.Y - p0.Y;
+			b = (double)p0.X - p1.X;                      // a,b 符号入れ替え
+			if (a < 0)
+			{
+				a = -a;
+				b = -b;
+			}
+			// ax + by + c= 0　で始点を通る cを求める。
+			c = -a * p0.X - b * p0.Y;
+		}
+
+
+
+		/// <summary>開始点・終了点からRectangleを生成します</summary>
+		/// <param name="bX">開始点X</param>
+		/// <param name="bY">開始点Y</param>
+		/// <param name="eX">終了点X</param>
+		/// <param name="eY">終了点Y</param>
+		/// <returns>生成した矩形(= Rectangle) </returns>
+		private Rectangle CreateRectFromMeasurePoint(int bX, int bY, int eX, int eY)
+		{
+			int minX, maxX, minY, maxY;
+
+			// x,yともに小さい座標を基点（左上）として矩形を生成する。
+			if( bX < eX ) {	minX = bX;	maxX = eX;	}
+			else				{	minX = eX;	maxX = bX;	}
+
+			if (bY < eY) 	{	minY = bY;	maxY = eY;	}
+			else				{	minY = eY;	maxY = bY;	}
+
+			return new Rectangle(minX, minY, (maxX - minX) + 1, (maxY - minY) + 1);
+		}
+
+
+		/// <summary>開始点・終了点からRectangleを生成します</summary>
+		/// <param name="bgn">開始点</param>
+		/// <param name="end">終了点</param>
+		/// <returns>生成した矩形(= Rectangle) </returns>
+		private Rectangle CreateRectFromMeasurePoint(Point bgn, Point end)
+		{
+			return CreateRectFromMeasurePoint(bgn.X, bgn.Y, end.X, end.Y);
+		}
+
+
+		/// <summary>「CSVファイル出力」が選択されたときの処理です</summary>
+		/// <param name="sender">送信元</param>
+		/// <param name="e">イベント情報</param>
+		private void cSVファイル出力ToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			if (_sourceImage== null || _isProfModeLine== null || _measureModePointB == null || _measureModePointE == null) return;
+
+			try
+			{
+				var bx = _measureModePointB.Value.X;
+				var by = _measureModePointB.Value.Y;
+				var ex = _measureModePointE.Value.X;
+				var ey = _measureModePointE.Value.Y;
+
+				string[] headers;		// ヘッダー行
+				Color[] datas;			// ピクセルデータ
+				string fname;			// デフォルトファイル名
+				if (_isProfModeLine.Value)
+				{
+					// ラインモードの場合には、2点間を結ぶライン上のピクセル（必ずしも描画ラインと同じではない）を出力する。タイトルに含まれる一部の','は'_'に置き換えておく
+					headers = new string[] { String.Format("Line ({0},{1}) - ({2},{3})", bx, by, ex, ey).Replace(',', '_'), "R, G, B" };
+					datas = GetLinePixels(_sourceImage, bx, by, ex, ey);
+					fname = String.Format("ProfLineData{0}.CSV", DateTime.Now.ToString("yyyyMMddHHmmss"));
+				}
+				else
+				{
+					// ボックスモードの場合には、2点を対角とする矩形内のピクセルを出力する。タイトルに含まれる一部の','は'_'に置き換えておく
+					headers = new string[] { String.Format("Box ({0},{1}) - ({2},{3})　{4}x{5}", bx, by, ex, ey, Math.Abs(ex - bx) + 1, Math.Abs(ey - by) + 1).Replace(',', '_'), "R, G, B" };
+					datas = GetBoxPixels(_sourceImage, bx, by, ex, ey);
+					fname = String.Format("ProfBoxData{0}.CSV", DateTime.Now.ToString("yyyyMMddHHmmss"));
+				}
+				OutCsvfilePixels(datas, headers, fname);
+			}
+			catch (Exception eee)
+			{
+				MessageBox.Show(String.Format("データ出力（CSVファイル" +
+					"）で例外発生 Message={0}, Stack={1}", eee.Message, eee.StackTrace), "例外", MessageBoxButtons.OK, MessageBoxIcon.Error);
+			}
+		}
+
+		/// <summary>「CSVファイル出力」が選択されたときの処理です</summary>
+		/// <param name="sender">送信元</param>
+		/// <param name="e">イベント情報</param>
+		private void cSVクリップボード出力ToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			if (_sourceImage == null || _isProfModeLine == null || _measureModePointB == null || _measureModePointE == null) return;
+
+			try
+			{
+				var bx = _measureModePointB.Value.X;
+				var by = _measureModePointB.Value.Y;
+				var ex = _measureModePointE.Value.X;
+				var ey = _measureModePointE.Value.Y;
+
+				string[] headers;       // ヘッダー行
+				Color[] datas;          // ピクセルデータ
+				if (_isProfModeLine.Value)
+				{
+					// ラインモードの場合には、2点間を結ぶライン上のピクセル（必ずしも描画ラインと同じではない）を出力する。タイトルに含まれる一部の','は'_'に置き換えておく
+					headers = new string[] { String.Format("Line ({0},{1}) - ({2},{3})", bx, by, ex, ey).Replace(',', '_'), "R\t G\t B" };
+					datas = GetLinePixels(_sourceImage, bx, by, ex, ey);
+				}
+				else
+				{
+					// ボックスモードの場合には、2点を対角とする矩形内のピクセルを出力する。タイトルに含まれる一部の','は'_'に置き換えておく
+					headers = new string[] { String.Format("Box ({0},{1}) - ({2},{3})　{4}x{5}", bx, by, ex, ey, Math.Abs(ex - bx) + 1, Math.Abs(ey - by) + 1).Replace(',', '_'), "R\t G\t B" };
+					datas = GetBoxPixels(_sourceImage, bx, by, ex, ey);
+				}
+				var w = String.Join("\r\n", CreatePxCsvFormat(datas, headers, "\t"));
+
+				Clipboard.SetDataObject(w, true);
+			}
+			catch (Exception eee)
+			{
+				MessageBox.Show(String.Format("データ出力（クリップボード）で例外発生 Message={0}, Stack={1}", eee.Message, eee.StackTrace), "例外", MessageBoxButtons.OK, MessageBoxIcon.Error);
+			}
+		}
+
+		/// <summary>
+		/// ピクセル群およびヘッダーを指定してCSVフォーマット文字列群を生成します</summary>
+		/// <param name="cols"></param>
+		/// <param name="headers"></param>
+		/// <param name="pad">連結文字列（通常、ファイル出力時はカンマ[=デフォルト]、クリップボード時はタブを指定する）</param>
+		/// <returns></returns>
+		private string[] CreatePxCsvFormat(Color[] cols, string[] headers, string pad= "," )
+		{
+			var w = cols.Select(c => String.Format("{1}{0}{2}{0}{3}", pad, c.R, c.G, c.B)).ToArray();
+			if (headers != null && headers.Any())
+			{
+				w = headers.Concat(w).ToArray();
+			}
+			return w;
+		}
+
+
+		/// <summary>
+		/// 指定されたピクセルデータをCSV形式で出力します</summary>
+		/// <param name="datas">ピクセルデータ群</param>
+		/// <param name="headers">ヘッダー行（複数）。不要の場合にはnullを指定する</param>
+		/// <param name="defname">デフォルトのファイル名</param>
+		/// <returns>成否</returns>
+		/// <remarks>ファイルダイアログで出力先を決定する</remarks>
+		private bool OutCsvfilePixels(Color[] datas, string[] headers, string defname)
+		{
+			try
+			{
+				var sfd = new SaveFileDialog();
+
+				sfd.FileName = defname;
+				sfd.InitialDirectory = System.Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+				sfd.Filter = "CSVファイル(*.csv)|*.csv|TXTファイル(*.txt)|*.txt|すべてのファイル(*.*)|*.*";
+				sfd.FilterIndex = 1;
+				sfd.Title = "保存ファイルを選択してください";
+				sfd.RestoreDirectory = true;
+				if (sfd.ShowDialog() == DialogResult.OK)
+				{
+					var w = CreatePxCsvFormat(datas, headers, ", ");
+					File.WriteAllLines(sfd.FileName, w, Encoding.GetEncoding("Shift_JIS"));
+				}
+			}
+			catch (Exception ex)
+			{
+				MessageBox.Show(String.Format("ファイル出力で例外発生 Message={0}, Stack={1}", ex.Message, ex.StackTrace), "ファイル出力エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				return false;
+			}
+			return false;
+		}
+
+
+
+		/// <summary>「トリミング」が選択されたときの処理です</summary>
+		/// <param name="sender">送信元</param>
+		/// <param name="e">イベント情報</param>
+		private void トリミングToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			if (_isProfModeLine == null || _isProfModeLine == true) return;
+
+			// 開始点、終了点から矩形を生成する。
+			var rect = CreateRectFromMeasurePoint(_measureModePointB.Value, _measureModePointE.Value);
+
+			var bmp = _sourceImage.Clone(rect, PixelFormat.Format24bppRgb);
+			var frm = new FormColorImageS(bmp, String.Format("トリミング {0}", rect.ToString()).Replace( ',', '_'), false, -1, -1, null, null, this.Icon);
+			frm.Show();
+		}
+
+
+		/// <summary>
+		/// ライン・ボックス指定時に「画像出力」が選択されたときの処理です</summary>
+		/// <param name="sender">送信元</param>
+		/// <param name="e">イベント情報</param>
+		private void 画像出力VToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			if (_sourceImage == null || _isProfModeLine != false || _measureModePointB == null || _measureModePointE == null) return;
+
+			try
+			{
+				// ボックスモード時以外は無視、ボックス内の画像を生成
+				var bx = _measureModePointB.Value.X;
+				var by = _measureModePointB.Value.Y;
+				var ex = _measureModePointE.Value.X;
+				var ey = _measureModePointE.Value.Y;
+				var rect = CreateRectFromMeasurePoint(_measureModePointB.Value, _measureModePointE.Value);
+				using (var wbmp = _sourceImage.Clone(rect, _sourceImage.PixelFormat))
+				{
+					var fname = $"{this.Text}_Trim_({bx}_{by})_{Math.Abs(ex-bx)+1}x{Math.Abs(ey-by)+1}";
+					OutBmpfilePixels(wbmp, fname);
+				}
+			}
+			catch (Exception eee)
+			{
+				MessageBox.Show(String.Format("データ出力で例外発生 Message={0}, Stack={1}", eee.Message, eee.StackTrace), "例外", MessageBoxButtons.OK, MessageBoxIcon.Error);
+			}
+		}
+
+
+		/// 指定された画像データを出力します</summary>
+		/// <param name="bmp">ビットマップ</param>
+		/// <param name="defname">デフォルトのファイル名</param>
+		/// <returns>成否</returns>
+		/// <remarks>ファイルダイアログで出力先を決定する</remarks>
+		private bool OutBmpfilePixels(Bitmap bmp, string defname)
+		{
+			try
+			{
+				var dic = new Dictionary<string, ImageFormat>() { { ".PNG", ImageFormat.Png }, { ".BMP", ImageFormat.Bmp }, { ".JPG", ImageFormat.Jpeg } };
+				var sfd = new SaveFileDialog();
+
+				sfd.FileName = defname;
+				sfd.InitialDirectory = System.Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+				sfd.Filter = "PNGファイル(*.png)|*.png|BMPファイル(*.bmp)|*.bmp|JPGファイル(*.jpg)|*.jpg|すべてのファイル(*.*)|*.*";
+				sfd.FilterIndex = 1;
+				sfd.Title = "保存ファイルを選択してください";
+				sfd.RestoreDirectory = true;
+				if (sfd.ShowDialog() == DialogResult.OK)
+				{
+					var imgfmt = ImageFormat.Jpeg;
+					if (dic.TryGetValue(Path.GetExtension(sfd.FileName).ToUpper(), out ImageFormat imf)) imgfmt = imf;
+					bmp.Save(sfd.FileName, imf);
+				}
+			}
+			catch (Exception ex)
+			{
+				MessageBox.Show(String.Format("ファイル出力で例外発生 Message={0}, Stack={1}", ex.Message, ex.StackTrace), "ファイル出力エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				return false;
+			}
+			return false;
+		}
+
+
+
+		/// <summary>
+		/// コンテキステメニュー（contextMenuStripProfData）が開くときの処理です</summary>
+		/// <param name="sender">送信元</param>
+		/// <param name="e">イベント情報</param>
+		/// <remarks>メニュー項目「トリミング」はモードがボックスモードの場合のみ有効とする</remarks>
+		private void contextMenuStripProfData_Opening(object sender, CancelEventArgs e)
+		{
+			トリミングToolStripMenuItem.Enabled = (_isProfModeLine!= null && _isProfModeLine.Value== false);
+		}
+
+
+		/// <summary>
+		/// Fixモードチェックボックスが変化したときの処理です</summary>
+		/// <param name="sender">送信元</param>
+		/// <param name="e">イベント情報</param>
+		/// <remarks>スケーラブルピクチャーボックスに固定モード状態を反映する</remarks>
+		private void cboxFix_CheckedChanged(object sender, EventArgs e)
+		{
+			var cbx = sender as CheckBox;
+			if( cbx == null || _scalePbox== null ) return;
+			_scalePbox.IsFixed = cbx.Checked;
+		}
+
+
+		/// <summary>
+		/// キーが押されたときの処理です </summary>
+		/// <param name="sender">送信元</param>
+		/// <param name="e">イベント情報</param>
+		private void FormColorImageS_KeyDown(object sender, KeyEventArgs e)
+		{
+			//　コントロールが押されているとき。
+			if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
+			{
+				// Ctrl+Shift
+				if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
+				{
+					switch (e.KeyCode)
+					{
+						case Keys.V:
+							クリップボードの表示情報インポートToolStripMenuItem_Click(sender, null);
+							e.Handled = true;           // 以下のコントロールにキーを渡さない
+							break;
+						case Keys.C:
+							表示情報をクリップボードへToolStripMenuItem_Click(sender, null);
+							e.Handled = true;           // 以下のコントロールにキーを渡さない
+							break;
+						case Keys.Up:
+							_opacityNumber = MaxOpcityNumber;   // 100%
+							e.Handled = true;           // 以下のコントロールにキーを渡さない
+							SetOpacity();
+							break;
+						case Keys.Down:
+							_opacityNumber = 0;         // 最低不透明度
+							e.Handled = true;           // 以下のコントロールにキーを渡さない
+							this.Opacity = 0.0;         // 完全に透明（押している間だけ→離すと最低不透明度に）
+														//SetOpacity();
+							break;
+						case Keys.Add:
+						case Keys.Oemplus:
+							_scalePbox.RatePlus(true);
+							e.Handled = true;           // 以下のコントロールにキーを渡さない
+							break;
+						case Keys.Subtract:
+						case Keys.OemMinus:
+							_scalePbox.RateMinus(true);
+							e.Handled = true;           // 以下のコントロールにキーを渡さない
+							break;
+					}
+				}
+				else
+				{
+					// Ctrl + キーによるショートカット
+					switch (e.KeyCode)
+					{
+						case Keys.V:
+							元画像を画像情報画面で表示ToolStripMenuItem_Click(sender, null);
+							e.Handled = true;           // 以下のコントロールにキーを渡さない
+							break;
+						case Keys.C:
+							元画像をクリップボードにコピーToolStripMenuItem_Click(sender, null);
+							e.Handled = true;           // 以下のコントロールにキーを渡さない
+							break;
+						case Keys.S:
+							元画像をファイルに保存ToolStripMenuItem_Click(sender, null);
+							e.Handled = true;           // 以下のコントロールにキーを渡さない
+							break;
+						case Keys.Up:
+							if (_opacityNumber < MaxOpcityNumber - 1) _opacityNumber++;
+							e.Handled = true;           // 以下のコントロールにキーを渡さない
+							SetOpacity();
+							break;
+						case Keys.Down:
+							if (_opacityNumber > 0) _opacityNumber--;
+							SetOpacity();
+							e.Handled = true;           // 以下のコントロールにキーを渡さない
+							break;
+						case Keys.Add:
+						case Keys.Oemplus:
+							_scalePbox.RatePlus(false);
+							e.Handled = true;           // 以下のコントロールにキーを渡さない
+							break;
+						case Keys.Subtract:
+						case Keys.OemMinus:
+							_scalePbox.RateMinus(false);
+							e.Handled = true;           // 以下のコントロールにキーを渡さない
+							break;
+						case Keys.Space:
+							// Ctrl+スペースで一度閉じたプロファイルを再表示する
+							if (_isProfModeLine != null)
+							{
+								if (_isProfModeLine == true)
+								{
+									if (_formProfViewerLine != null) _formProfViewerLine.Show();
+								}
+								else
+								{
+									if (_formProfViewerBoxH != null) _formProfViewerBoxH.Show();
+									if (_formProfViewerBoxV != null) _formProfViewerBoxV.Show();
+								}
+							}
+							break;
+						default:
+							// コントロールキーだけの押下
+							if (e.KeyCode == Keys.Control)
+							{
+								// プロファイル中かつ指定中でない場合・・
+								if (_isProfModeLine != null)
+								{
+								}
+								
+							}
+							break;
+					}
+				}
+			}
+			else
+			{
+			}
+		}
+
+
+		/// <summary>
+		/// フォームの不透明度を設定します。</summary>
+		private void SetOpacity()
+		{
+			this.Opacity = _opacityNumber * (1.0 - MinOpcityValue) / MaxOpcityNumber + MinOpcityValue;
+		}
+
+
+
+		/// <summary>
+		/// 「数値入力」が選択されたときの処理です</summary>
+		/// <param name="sender">送信元</param>
+		/// <param name="e">イベント情報</param>
+		private void 数値入力ToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			var frm = new FormDirectNumerical(_sourceImage.Size,  _measureModePointB, _measureModePointE);
+			if (frm.ShowDialog() == DialogResult.OK)
+			{
+				var w = frm.GetArea();
+				rbtnProfModeOff.Checked = true;
+				if (w.Bgn.X == w.End.X || w.Bgn.Y == w.End.Y) rbtnProfModeLine.Checked = true;
+				else rbtnProfModeBox.Checked = true;
+
+				_measureModePointB = w.Bgn;
+				_measureModePointE = w.End;
+				_scalePbox.DrawMainImage();
+				Refresh();
+			}
+
+		}
+	}
+
+
+
+
+	// --- FormClorImageS用設定クラス
+
+	/// <summary>
+	/// FormClorImageS用設定クラスです
+	/// </summary>
+	[Serializable]
+	[TypeConverter(typeof(PropertyDisplayConverter))]
+	public class ColImageSetteings : ICloneable, IComparable
+	{
+
+		/// <summary> 表示画像の拡大・縮小時の方法（デフォルト・非縮小時） </summary>
+		private InterpolationMode _mainInterpolationMode = InterpolationMode.NearestNeighbor;
+
+		/// <summary> 表示画像の拡大・縮小時の方法（縮小時） </summary>
+		private InterpolationMode _mainInterpolationModeReduce = InterpolationMode.HighQualityBilinear;
+
+		/// <summary> 背景（画像のない部分）の色 </summary>
+		private Color _backColor = Color.Black;
+
+
+		/// <summary>
+		/// コンストラクタです
+		/// </summary>
+		public ColImageSetteings()
+		{
+			SetDefaultValue();
+		}
+
+
+		/// <summary>
+		/// 全メンバ指定のコンストラクタです
+		/// </summary>
+		/// <param name="interpolMode">表示画像の拡大・縮小時の方法</param>
+		/// <param name="interpolModeR">縮小時の表示画像の拡大・縮小時の方法</param>
+		/// <param name="bkCol">背景色</param>
+		public ColImageSetteings(InterpolationMode interpolMode, InterpolationMode interpolModeR, Color bkCol)
+		{
+			_mainInterpolationMode = interpolMode;
+			_mainInterpolationModeReduce = interpolModeR;
+			_backColor = bkCol;
+		}
+
+
+		/// <summary> デフォルト値のセット </summary>
+		public void SetDefaultValue()
+		{
+			// 最近傍法をデフォルトとする
+			_mainInterpolationMode = InterpolationMode.NearestNeighbor;
+			// 縮小時はハイクオリティーバイリニアをデフォルトとする
+			_mainInterpolationModeReduce = InterpolationMode.HighQualityBilinear;
+
+			_backColor = Color.Black;
+		}
+
+
+		/// <summary>
+		/// 全メンバ指定比較メソッドです
+		/// </summary>
+		/// <param name="interpolMode">表示画像の拡大・縮小時の方法</param>
+		/// <param name="interpolModeR">縮小時の表示画像の拡大・縮小時の方法</param>
+		/// <param name="bkCol">背景色</param>
+		/// <returns>比較結果 0:一致</returns>
+		public int CompareAllMenber(InterpolationMode mainInterpolationMode, InterpolationMode mainInterpolationModeR, Color bkCol)
+		{
+			var w = (int)_mainInterpolationMode.CompareTo(mainInterpolationMode);
+			if (w != 0) return w;
+
+			w = (int)_mainInterpolationModeReduce.CompareTo(mainInterpolationModeR);
+			if (w != 0) return w;
+
+			w = _backColor.ToArgb() - bkCol.ToArgb();
+			if (w != 0) return w;
+
+			return w;
+		}
+
+
+		/// <summary>
+		/// クローンを生成します
+		/// </summary>
+		/// <returns>生成されたクローンオブジェクト</returns>
+		public object Clone()
+		{
+			return new ColImageSetteings(_mainInterpolationMode, _mainInterpolationModeReduce, _backColor);
+		}
+
+		/// <summary>
+		/// オブジェクトを比較します
+		/// </summary>
+		/// <param name="obj">比較対象オブジェクト</param>
+		/// <returns>比較結果</returns>
+		public int CompareTo(object obj)
+		{
+			var dst = (ColImageSetteings)obj;
+			return CompareAllMenber(dst.MainInterpolationMode, dst.MainInterpolationModeReduce, dst.BackColor);
+
+		}
+
+		[Category("１．表示設定")]
+		[Description("表示画像の拡大・縮小時の方法（デフォルト・非縮小時）")]
+		[DefaultValue(InterpolationMode.NearestNeighbor)]
+		[PropertyDisplayName("01.描画／補間方式")]
+		/// <summary> 表示画像の拡大・縮小時の方法を取得または設定します </summary>
+		public InterpolationMode MainInterpolationMode
+		{
+			set { _mainInterpolationMode = value; }
+			get { return _mainInterpolationMode; }
+		}
+
+		[Category("１．表示設定")]
+		[Description("縮小時の表示画像の拡大・縮小時の方法")]
+		[DefaultValue(InterpolationMode.HighQualityBilinear)]
+		[PropertyDisplayName("02.描画／補間方式（縮小時）")]
+		/// <summary> 表示画像の拡大・縮小時の方法を取得または設定します </summary>
+		public InterpolationMode MainInterpolationModeReduce
+		{
+			set { _mainInterpolationModeReduce = value; }
+			get { return _mainInterpolationModeReduce; }
+		}
+		[Category("１．表示設定")]
+		[Description("背景色（画像のない部分）の色を取得または設定します")]
+		[DefaultValue(0)]
+		[PropertyDisplayName("03.背景色")]
+		/// <summary> 背景色（画像のない部分）の色を取得または設定します </summary>
+		public Color BackColor
+		{
+			set { _backColor = value; }
+			get { return _backColor; }
+		}
+
+	}
+}
