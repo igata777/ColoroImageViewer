@@ -8,6 +8,7 @@ using System.Text;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Windows.Forms;
+using System.Text.Json;
 
 namespace ColorImageViewProject
 {
@@ -103,23 +104,24 @@ namespace ColorImageViewProject
 
 
 		/// <summary>
-		/// オブジェクトのディープコピーを返します。
-		/// </summary>
+		/// オブジェクトのディープコピーを返します。</summary>
 		/// <returns>オブジェクト</returns>
-		public object CloneObject(object serialObj)
+		public T CloneObject<T>(T serialObj)
 		{
-			object clone = null;
-
-			using (var stream = new MemoryStream())
+			// JSON のシリアライズおよびデシリアライズの振る舞いを制御するためのオプションを設定する
+			var options = new JsonSerializerOptions
 			{
-				var formatter = new BinaryFormatter();
-				formatter.Serialize(stream, serialObj);
-				stream.Position = 0;
-				clone = formatter.Deserialize(stream);
-			}
-
-			return clone;
+				// これにより、循環参照があるオブジェクトや同一オブジェクトへの複数の参照がある場合にも正しくシリアライズ/デシリアライズを行うことができる
+				ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.Preserve
+			};
+			// シリアライズ→デシリアライズしてクローン作成。
+			var jsonString = JsonSerializer.Serialize(serialObj, options);
+			return JsonSerializer.Deserialize<T>(jsonString, options);
 		}
+
+
+
+
 
 	}
 

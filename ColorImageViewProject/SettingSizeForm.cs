@@ -19,7 +19,7 @@ namespace ColorImageViewProject
 		/// <summary>
 		/// 設定した幅の値を取得します
 		/// </summary>
-		public int Width
+		public int ValueWidth
 		{
 			get { return (int)nudWidth.Value; }
 		}
@@ -27,7 +27,7 @@ namespace ColorImageViewProject
 		/// <summary>
 		/// 設定した高さの値を取得します
 		/// </summary>
-		public int Height
+		public int ValueHeight
 		{
 			get { return (int)nudHeight.Value; }
 		}

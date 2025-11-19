@@ -103,21 +103,13 @@ namespace ColorImageViewProject
 		private void FormProfileViewer_FormClosed(object sender, FormClosedEventArgs e)
 		{
 			// 破棄
-			if (_graWorkPbox != null)
-			{
-				_graWorkPbox.Dispose();
-				_graWorkPbox = null;
-			}
-			if (_bmpWorkPbox != null)
-			{
-				_bmpWorkPbox.Dispose();
-				_bmpWorkPbox = null;
-			}
-			if (_matWorkPbox != null)
-			{
-				_matWorkPbox.Dispose();
-				_matWorkPbox = null;
-			}
+			_graWorkPbox?.Dispose();
+			_bmpWorkPbox?.Dispose();
+			_matWorkPbox?.Dispose();
+
+			_graWorkPbox = null;
+			_bmpWorkPbox = null;
+			_matWorkPbox = null;
 
 			if (_onClosingAction != null) _onClosingAction();
 		}
@@ -194,11 +186,11 @@ namespace ColorImageViewProject
 		}
 
 
-
 		/// <summary>
 		/// グラフデータを描画します</summary>
 		public void DrawData()
 		{
+			if (_matWorkPbox == null) return;
 			// 座標設定
 			_matWorkPbox.Reset();
 			_matWorkPbox.Translate(0f, _bmpWorkPbox.Height, MatrixOrder.Prepend);              // 平行移動
@@ -209,7 +201,6 @@ namespace ColorImageViewProject
 
 			Refresh();
 		}
-
 
 
 		/// <summary>

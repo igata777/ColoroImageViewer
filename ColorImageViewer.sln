@@ -1,11 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.29418.71
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34322.80
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ColorImageViewer", "ColorImageViewer\ColorImageViewer.csproj", "{7031CB4B-A5E8-41BB-9EDF-B5A4DD9C0FAB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ColorImageViewer", "ColorImageViewer\ColorImageViewer.csproj", "{7031CB4B-A5E8-41BB-9EDF-B5A4DD9C0FAB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ColorImageViewProject", "ColorImageViewProject\ColorImageViewProject.csproj", "{A2539B82-42AE-4A8B-9918-0DA558965569}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ColorImageViewProject", "ColorImageViewProject\ColorImageViewProject.csproj", "{A2539B82-42AE-4A8B-9918-0DA558965569}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

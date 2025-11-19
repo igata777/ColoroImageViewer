@@ -28,555 +28,592 @@
 		/// </summary>
 		private void InitializeComponent()
 		{
-			this.components = new System.ComponentModel.Container();
-			this.pboxColImage = new System.Windows.Forms.PictureBox();
-			this.contextMenuStripL = new System.Windows.Forms.ContextMenuStrip(this.components);
-			this.表示画像を保存ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.表示画像をクリップボードにコピーToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.表示画像を画像情報画面で表示scalPboxToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
-			this.元画像をファイルに保存ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.元画像をクリップボードにコピーToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.元画像を画像情報画面で表示ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.toolStripSeparator2 = new System.Windows.Forms.ToolStripSeparator();
-			this.表示情報をクリップボードへToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.クリップボードの表示情報インポートToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.toolStripSeparator3 = new System.Windows.Forms.ToolStripSeparator();
-			this.余白の削除ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.toolStripSeparator4 = new System.Windows.Forms.ToolStripSeparator();
-			this.toolStripSeparator5 = new System.Windows.Forms.ToolStripSeparator();
-			this.FormClorImageS設定ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.表示枠情報を別の画像情報画面に表示ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.toolStripSeparator6 = new System.Windows.Forms.ToolStripSeparator();
-			this.プロファイル数値入力ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.labelDisplayRate = new System.Windows.Forms.Label();
-			this.contextMenuStripRate = new System.Windows.Forms.ContextMenuStrip(this.components);
-			this.指定倍率ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.等倍100ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.fitToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.labelMouseCursor1 = new System.Windows.Forms.Label();
-			this.contextMenuStripDispInfo = new System.Windows.Forms.ContextMenuStrip(this.components);
-			this.表示サイズ指定ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
-			this.labelDispInfo = new System.Windows.Forms.Label();
-			this.tboxProfInfo = new System.Windows.Forms.TextBox();
-			this.contextMenuStripProfData = new System.Windows.Forms.ContextMenuStrip(this.components);
-			this.cSVファイル出力ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.cSVクリップボードToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.toolStripSeparator7 = new System.Windows.Forms.ToolStripSeparator();
-			this.トリミングToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.数値入力ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.画像出力VToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.labelMouseCursor3 = new System.Windows.Forms.Label();
-			this.labelAverageColor = new System.Windows.Forms.Label();
-			this.gboxProfileMode = new System.Windows.Forms.GroupBox();
-			this.rbtnProfModeBox = new System.Windows.Forms.RadioButton();
-			this.rbtnProfModeLine = new System.Windows.Forms.RadioButton();
-			this.rbtnProfModeOff = new System.Windows.Forms.RadioButton();
-			this.cboxFix = new System.Windows.Forms.CheckBox();
-			this.labelProfSize = new System.Windows.Forms.Label();
-			this.labelMouseCursor2 = new System.Windows.Forms.Label();
-			this.labelMouseCursorXY = new System.Windows.Forms.Label();
-			this.lblImageSize = new System.Windows.Forms.Label();
-			this.label2 = new System.Windows.Forms.Label();
-			this.lblSubPx = new System.Windows.Forms.Label();
-			((System.ComponentModel.ISupportInitialize)(this.pboxColImage)).BeginInit();
-			this.contextMenuStripL.SuspendLayout();
-			this.contextMenuStripRate.SuspendLayout();
-			this.contextMenuStripDispInfo.SuspendLayout();
-			this.contextMenuStripProfData.SuspendLayout();
-			this.gboxProfileMode.SuspendLayout();
-			this.SuspendLayout();
+			components = new System.ComponentModel.Container();
+			System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FormColorImageS));
+			pboxColImage = new System.Windows.Forms.PictureBox();
+			contextMenuStripL = new System.Windows.Forms.ContextMenuStrip(components);
+			表示画像を保存ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			表示画像をクリップボードにコピーToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			表示画像を画像情報画面で表示scalPboxToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
+			元画像をファイルに保存ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			元画像をクリップボードにコピーToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			元画像を画像情報画面で表示ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			toolStripSeparator2 = new System.Windows.Forms.ToolStripSeparator();
+			表示情報をクリップボードへToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			クリップボードの表示情報インポートToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			toolStripSeparator3 = new System.Windows.Forms.ToolStripSeparator();
+			余白の削除ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			toolStripSeparator4 = new System.Windows.Forms.ToolStripSeparator();
+			toolStripSeparator5 = new System.Windows.Forms.ToolStripSeparator();
+			FormClorImageS設定ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			表示枠情報を別の画像情報画面に表示ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			toolStripSeparator6 = new System.Windows.Forms.ToolStripSeparator();
+			プロファイル数値入力ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			labelDisplayRate = new System.Windows.Forms.Label();
+			contextMenuStripRate = new System.Windows.Forms.ContextMenuStrip(components);
+			指定倍率ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			等倍100ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			fitToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			labelMouseCursor1 = new System.Windows.Forms.Label();
+			contextMenuStripDispInfo = new System.Windows.Forms.ContextMenuStrip(components);
+			表示サイズ指定ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			toolTip1 = new System.Windows.Forms.ToolTip(components);
+			labelDispInfo = new System.Windows.Forms.Label();
+			tboxProfInfo = new System.Windows.Forms.TextBox();
+			contextMenuStripProfData = new System.Windows.Forms.ContextMenuStrip(components);
+			cSVファイル出力ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			cSVクリップボードToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			toolStripSeparator7 = new System.Windows.Forms.ToolStripSeparator();
+			トリミングToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			数値入力ToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			画像出力VToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			labelMouseCursor3 = new System.Windows.Forms.Label();
+			labelAverageColor = new System.Windows.Forms.Label();
+			lblSubPx = new System.Windows.Forms.Label();
+			lblEditTitle = new System.Windows.Forms.Label();
+			gboxProfileMode = new System.Windows.Forms.GroupBox();
+			rbtnProfModeBox = new System.Windows.Forms.RadioButton();
+			rbtnProfModeLine = new System.Windows.Forms.RadioButton();
+			rbtnProfModeOff = new System.Windows.Forms.RadioButton();
+			cboxFix = new System.Windows.Forms.CheckBox();
+			labelProfSize = new System.Windows.Forms.Label();
+			labelMouseCursor2 = new System.Windows.Forms.Label();
+			labelMouseCursorXY = new System.Windows.Forms.Label();
+			lblImageSize = new System.Windows.Forms.Label();
+			label2 = new System.Windows.Forms.Label();
+			tboxEditTitle = new System.Windows.Forms.TextBox();
+			btnChangeTitle = new System.Windows.Forms.Button();
+			((System.ComponentModel.ISupportInitialize)pboxColImage).BeginInit();
+			contextMenuStripL.SuspendLayout();
+			contextMenuStripRate.SuspendLayout();
+			contextMenuStripDispInfo.SuspendLayout();
+			contextMenuStripProfData.SuspendLayout();
+			gboxProfileMode.SuspendLayout();
+			SuspendLayout();
 			// 
 			// pboxColImage
 			// 
-			this.pboxColImage.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-			this.pboxColImage.BackColor = System.Drawing.SystemColors.ActiveCaptionText;
-			this.pboxColImage.ContextMenuStrip = this.contextMenuStripL;
-			this.pboxColImage.Location = new System.Drawing.Point(23, 22);
-			this.pboxColImage.Margin = new System.Windows.Forms.Padding(2);
-			this.pboxColImage.Name = "pboxColImage";
-			this.pboxColImage.Size = new System.Drawing.Size(827, 487);
-			this.pboxColImage.TabIndex = 0;
-			this.pboxColImage.TabStop = false;
-			this.pboxColImage.DoubleClick += new System.EventHandler(this.pboxColImage_DoubleClick);
-			this.pboxColImage.Resize += new System.EventHandler(this.pboxColImage_Resize);
+			pboxColImage.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
+			pboxColImage.BackColor = System.Drawing.SystemColors.ActiveCaptionText;
+			pboxColImage.ContextMenuStrip = contextMenuStripL;
+			pboxColImage.Location = new System.Drawing.Point(31, 35);
+			pboxColImage.Margin = new System.Windows.Forms.Padding(2);
+			pboxColImage.Name = "pboxColImage";
+			pboxColImage.Size = new System.Drawing.Size(968, 606);
+			pboxColImage.TabIndex = 0;
+			pboxColImage.TabStop = false;
+			pboxColImage.DragDrop += FormMain_DragDrop;
+			pboxColImage.DragEnter += FormMain_DragEnter;
+			pboxColImage.DoubleClick += pboxColImage_DoubleClick;
+			pboxColImage.Resize += pboxColImage_Resize;
 			// 
 			// contextMenuStripL
 			// 
-			this.contextMenuStripL.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.表示画像を保存ToolStripMenuItem,
-            this.表示画像をクリップボードにコピーToolStripMenuItem,
-            this.表示画像を画像情報画面で表示scalPboxToolStripMenuItem,
-            this.toolStripSeparator1,
-            this.元画像をファイルに保存ToolStripMenuItem,
-            this.元画像をクリップボードにコピーToolStripMenuItem,
-            this.元画像を画像情報画面で表示ToolStripMenuItem,
-            this.toolStripSeparator2,
-            this.表示情報をクリップボードへToolStripMenuItem,
-            this.クリップボードの表示情報インポートToolStripMenuItem,
-            this.toolStripSeparator3,
-            this.余白の削除ToolStripMenuItem,
-            this.toolStripSeparator4,
-            this.toolStripSeparator5,
-            this.FormClorImageS設定ToolStripMenuItem,
-            this.表示枠情報を別の画像情報画面に表示ToolStripMenuItem,
-            this.toolStripSeparator6,
-            this.プロファイル数値入力ToolStripMenuItem});
-			this.contextMenuStripL.Name = "contextMenuStripL";
-			this.contextMenuStripL.Size = new System.Drawing.Size(281, 304);
+			contextMenuStripL.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { 表示画像を保存ToolStripMenuItem, 表示画像をクリップボードにコピーToolStripMenuItem, 表示画像を画像情報画面で表示scalPboxToolStripMenuItem, toolStripSeparator1, 元画像をファイルに保存ToolStripMenuItem, 元画像をクリップボードにコピーToolStripMenuItem, 元画像を画像情報画面で表示ToolStripMenuItem, toolStripSeparator2, 表示情報をクリップボードへToolStripMenuItem, クリップボードの表示情報インポートToolStripMenuItem, toolStripSeparator3, 余白の削除ToolStripMenuItem, toolStripSeparator4, toolStripSeparator5, FormClorImageS設定ToolStripMenuItem, 表示枠情報を別の画像情報画面に表示ToolStripMenuItem, toolStripSeparator6, プロファイル数値入力ToolStripMenuItem });
+			contextMenuStripL.Name = "contextMenuStripL";
+			contextMenuStripL.Size = new System.Drawing.Size(327, 304);
 			// 
 			// 表示画像を保存ToolStripMenuItem
 			// 
-			this.表示画像を保存ToolStripMenuItem.Name = "表示画像を保存ToolStripMenuItem";
-			this.表示画像を保存ToolStripMenuItem.Size = new System.Drawing.Size(280, 22);
-			this.表示画像を保存ToolStripMenuItem.Text = "表示画像をファイルに保存";
-			this.表示画像を保存ToolStripMenuItem.Click += new System.EventHandler(this.表示画像をファイルに保存ToolStripMenuItem_Click);
+			表示画像を保存ToolStripMenuItem.Name = "表示画像を保存ToolStripMenuItem";
+			表示画像を保存ToolStripMenuItem.Size = new System.Drawing.Size(326, 22);
+			表示画像を保存ToolStripMenuItem.Text = "表示画像をファイルに保存";
+			表示画像を保存ToolStripMenuItem.Click += 表示画像をファイルに保存ToolStripMenuItem_Click;
 			// 
 			// 表示画像をクリップボードにコピーToolStripMenuItem
 			// 
-			this.表示画像をクリップボードにコピーToolStripMenuItem.Name = "表示画像をクリップボードにコピーToolStripMenuItem";
-			this.表示画像をクリップボードにコピーToolStripMenuItem.Size = new System.Drawing.Size(280, 22);
-			this.表示画像をクリップボードにコピーToolStripMenuItem.Text = "表示画像をクリップボードにコピー";
-			this.表示画像をクリップボードにコピーToolStripMenuItem.Click += new System.EventHandler(this.表示画像をクリップボードにコピーToolStripMenuItem_Click);
+			表示画像をクリップボードにコピーToolStripMenuItem.Name = "表示画像をクリップボードにコピーToolStripMenuItem";
+			表示画像をクリップボードにコピーToolStripMenuItem.Size = new System.Drawing.Size(326, 22);
+			表示画像をクリップボードにコピーToolStripMenuItem.Text = "表示画像をクリップボードにコピー";
+			表示画像をクリップボードにコピーToolStripMenuItem.Click += 表示画像をクリップボードにコピーToolStripMenuItem_Click;
 			// 
 			// 表示画像を画像情報画面で表示scalPboxToolStripMenuItem
 			// 
-			this.表示画像を画像情報画面で表示scalPboxToolStripMenuItem.Name = "表示画像を画像情報画面で表示scalPboxToolStripMenuItem";
-			this.表示画像を画像情報画面で表示scalPboxToolStripMenuItem.Size = new System.Drawing.Size(280, 22);
-			this.表示画像を画像情報画面で表示scalPboxToolStripMenuItem.Text = "表示画像を画像情報画面で表示";
-			this.表示画像を画像情報画面で表示scalPboxToolStripMenuItem.Click += new System.EventHandler(this.表示画像を画像情報画面で表示ToolStripMenuItem_Click);
+			表示画像を画像情報画面で表示scalPboxToolStripMenuItem.Name = "表示画像を画像情報画面で表示scalPboxToolStripMenuItem";
+			表示画像を画像情報画面で表示scalPboxToolStripMenuItem.Size = new System.Drawing.Size(326, 22);
+			表示画像を画像情報画面で表示scalPboxToolStripMenuItem.Text = "表示画像を画像情報画面で表示";
+			表示画像を画像情報画面で表示scalPboxToolStripMenuItem.Click += 表示画像を画像情報画面で表示ToolStripMenuItem_Click;
 			// 
 			// toolStripSeparator1
 			// 
-			this.toolStripSeparator1.Name = "toolStripSeparator1";
-			this.toolStripSeparator1.Size = new System.Drawing.Size(277, 6);
+			toolStripSeparator1.Name = "toolStripSeparator1";
+			toolStripSeparator1.Size = new System.Drawing.Size(323, 6);
 			// 
 			// 元画像をファイルに保存ToolStripMenuItem
 			// 
-			this.元画像をファイルに保存ToolStripMenuItem.Name = "元画像をファイルに保存ToolStripMenuItem";
-			this.元画像をファイルに保存ToolStripMenuItem.Size = new System.Drawing.Size(280, 22);
-			this.元画像をファイルに保存ToolStripMenuItem.Text = "元画像をファイルに保存(&S)";
-			this.元画像をファイルに保存ToolStripMenuItem.Click += new System.EventHandler(this.元画像をファイルに保存ToolStripMenuItem_Click);
+			元画像をファイルに保存ToolStripMenuItem.Name = "元画像をファイルに保存ToolStripMenuItem";
+			元画像をファイルに保存ToolStripMenuItem.Size = new System.Drawing.Size(326, 22);
+			元画像をファイルに保存ToolStripMenuItem.Text = "元画像をファイルに保存(&S)";
+			元画像をファイルに保存ToolStripMenuItem.Click += 元画像をファイルに保存ToolStripMenuItem_Click;
 			// 
 			// 元画像をクリップボードにコピーToolStripMenuItem
 			// 
-			this.元画像をクリップボードにコピーToolStripMenuItem.Name = "元画像をクリップボードにコピーToolStripMenuItem";
-			this.元画像をクリップボードにコピーToolStripMenuItem.Size = new System.Drawing.Size(280, 22);
-			this.元画像をクリップボードにコピーToolStripMenuItem.Text = "元画像をクリップボードにコピー(&C)";
-			this.元画像をクリップボードにコピーToolStripMenuItem.Click += new System.EventHandler(this.元画像をクリップボードにコピーToolStripMenuItem_Click);
+			元画像をクリップボードにコピーToolStripMenuItem.Name = "元画像をクリップボードにコピーToolStripMenuItem";
+			元画像をクリップボードにコピーToolStripMenuItem.Size = new System.Drawing.Size(326, 22);
+			元画像をクリップボードにコピーToolStripMenuItem.Text = "元画像をクリップボードにコピー(&C)";
+			元画像をクリップボードにコピーToolStripMenuItem.Click += 元画像をクリップボードにコピーToolStripMenuItem_Click;
 			// 
 			// 元画像を画像情報画面で表示ToolStripMenuItem
 			// 
-			this.元画像を画像情報画面で表示ToolStripMenuItem.Name = "元画像を画像情報画面で表示ToolStripMenuItem";
-			this.元画像を画像情報画面で表示ToolStripMenuItem.Size = new System.Drawing.Size(280, 22);
-			this.元画像を画像情報画面で表示ToolStripMenuItem.Text = "元画像を画像情報画面で表示(&V)";
-			this.元画像を画像情報画面で表示ToolStripMenuItem.Click += new System.EventHandler(this.元画像を画像情報画面で表示ToolStripMenuItem_Click);
+			元画像を画像情報画面で表示ToolStripMenuItem.Name = "元画像を画像情報画面で表示ToolStripMenuItem";
+			元画像を画像情報画面で表示ToolStripMenuItem.Size = new System.Drawing.Size(326, 22);
+			元画像を画像情報画面で表示ToolStripMenuItem.Text = "元画像を画像情報画面で表示(&V)";
+			元画像を画像情報画面で表示ToolStripMenuItem.Click += 元画像を画像情報画面で表示ToolStripMenuItem_Click;
 			// 
 			// toolStripSeparator2
 			// 
-			this.toolStripSeparator2.Name = "toolStripSeparator2";
-			this.toolStripSeparator2.Size = new System.Drawing.Size(277, 6);
+			toolStripSeparator2.Name = "toolStripSeparator2";
+			toolStripSeparator2.Size = new System.Drawing.Size(323, 6);
 			// 
 			// 表示情報をクリップボードへToolStripMenuItem
 			// 
-			this.表示情報をクリップボードへToolStripMenuItem.Name = "表示情報をクリップボードへToolStripMenuItem";
-			this.表示情報をクリップボードへToolStripMenuItem.Size = new System.Drawing.Size(280, 22);
-			this.表示情報をクリップボードへToolStripMenuItem.Text = "表示情報をクリップボードへ";
-			this.表示情報をクリップボードへToolStripMenuItem.Click += new System.EventHandler(this.表示情報をクリップボードへToolStripMenuItem_Click);
+			表示情報をクリップボードへToolStripMenuItem.Name = "表示情報をクリップボードへToolStripMenuItem";
+			表示情報をクリップボードへToolStripMenuItem.Size = new System.Drawing.Size(326, 22);
+			表示情報をクリップボードへToolStripMenuItem.Text = "表示情報をクリップボードへ [ Ctrl +Shift + C ]";
+			表示情報をクリップボードへToolStripMenuItem.Click += 表示情報をクリップボードへToolStripMenuItem_Click;
 			// 
 			// クリップボードの表示情報インポートToolStripMenuItem
 			// 
-			this.クリップボードの表示情報インポートToolStripMenuItem.Name = "クリップボードの表示情報インポートToolStripMenuItem";
-			this.クリップボードの表示情報インポートToolStripMenuItem.Size = new System.Drawing.Size(280, 22);
-			this.クリップボードの表示情報インポートToolStripMenuItem.Text = "クリップボードの表示情報インポート";
-			this.クリップボードの表示情報インポートToolStripMenuItem.Click += new System.EventHandler(this.クリップボードの表示情報インポートToolStripMenuItem_Click);
+			クリップボードの表示情報インポートToolStripMenuItem.Name = "クリップボードの表示情報インポートToolStripMenuItem";
+			クリップボードの表示情報インポートToolStripMenuItem.Size = new System.Drawing.Size(326, 22);
+			クリップボードの表示情報インポートToolStripMenuItem.Text = "クリップボードの表示情報インポート [ Ctrl +Shift + V ]";
+			クリップボードの表示情報インポートToolStripMenuItem.Click += クリップボードの表示情報インポートToolStripMenuItem_Click;
 			// 
 			// toolStripSeparator3
 			// 
-			this.toolStripSeparator3.Name = "toolStripSeparator3";
-			this.toolStripSeparator3.Size = new System.Drawing.Size(277, 6);
+			toolStripSeparator3.Name = "toolStripSeparator3";
+			toolStripSeparator3.Size = new System.Drawing.Size(323, 6);
 			// 
 			// 余白の削除ToolStripMenuItem
 			// 
-			this.余白の削除ToolStripMenuItem.Name = "余白の削除ToolStripMenuItem";
-			this.余白の削除ToolStripMenuItem.Size = new System.Drawing.Size(280, 22);
-			this.余白の削除ToolStripMenuItem.Text = "余白の削除(Alt+ダブルクリック）";
-			this.余白の削除ToolStripMenuItem.Click += new System.EventHandler(this.余白の削除ToolStripMenuItem_Click);
+			余白の削除ToolStripMenuItem.Name = "余白の削除ToolStripMenuItem";
+			余白の削除ToolStripMenuItem.Size = new System.Drawing.Size(326, 22);
+			余白の削除ToolStripMenuItem.Text = "余白の削除(Alt+ダブルクリック）";
+			余白の削除ToolStripMenuItem.Click += 余白の削除ToolStripMenuItem_Click;
 			// 
 			// toolStripSeparator4
 			// 
-			this.toolStripSeparator4.Name = "toolStripSeparator4";
-			this.toolStripSeparator4.Size = new System.Drawing.Size(277, 6);
+			toolStripSeparator4.Name = "toolStripSeparator4";
+			toolStripSeparator4.Size = new System.Drawing.Size(323, 6);
 			// 
 			// toolStripSeparator5
 			// 
-			this.toolStripSeparator5.Name = "toolStripSeparator5";
-			this.toolStripSeparator5.Size = new System.Drawing.Size(277, 6);
+			toolStripSeparator5.Name = "toolStripSeparator5";
+			toolStripSeparator5.Size = new System.Drawing.Size(323, 6);
 			// 
 			// FormClorImageS設定ToolStripMenuItem
 			// 
-			this.FormClorImageS設定ToolStripMenuItem.Name = "FormClorImageS設定ToolStripMenuItem";
-			this.FormClorImageS設定ToolStripMenuItem.Size = new System.Drawing.Size(280, 22);
-			this.FormClorImageS設定ToolStripMenuItem.Text = "設定";
-			this.FormClorImageS設定ToolStripMenuItem.Click += new System.EventHandler(this.FormClorImageS設定ToolStripMenuItem_Click);
+			FormClorImageS設定ToolStripMenuItem.Name = "FormClorImageS設定ToolStripMenuItem";
+			FormClorImageS設定ToolStripMenuItem.Size = new System.Drawing.Size(326, 22);
+			FormClorImageS設定ToolStripMenuItem.Text = "設定";
+			FormClorImageS設定ToolStripMenuItem.Click += FormClorImageS設定ToolStripMenuItem_Click;
 			// 
 			// 表示枠情報を別の画像情報画面に表示ToolStripMenuItem
 			// 
-			this.表示枠情報を別の画像情報画面に表示ToolStripMenuItem.Name = "表示枠情報を別の画像情報画面に表示ToolStripMenuItem";
-			this.表示枠情報を別の画像情報画面に表示ToolStripMenuItem.Size = new System.Drawing.Size(280, 22);
-			this.表示枠情報を別の画像情報画面に表示ToolStripMenuItem.Text = "表示枠情報を別の画像情報画面に表示";
-			this.表示枠情報を別の画像情報画面に表示ToolStripMenuItem.Click += new System.EventHandler(this.表示枠情報を別の画像情報画面に表示ToolStripMenuItem_Click);
+			表示枠情報を別の画像情報画面に表示ToolStripMenuItem.Name = "表示枠情報を別の画像情報画面に表示ToolStripMenuItem";
+			表示枠情報を別の画像情報画面に表示ToolStripMenuItem.Size = new System.Drawing.Size(326, 22);
+			表示枠情報を別の画像情報画面に表示ToolStripMenuItem.Text = "表示枠情報を別の画像情報画面に表示";
+			表示枠情報を別の画像情報画面に表示ToolStripMenuItem.Click += 表示枠情報を別の画像情報画面に表示ToolStripMenuItem_Click;
 			// 
 			// toolStripSeparator6
 			// 
-			this.toolStripSeparator6.Name = "toolStripSeparator6";
-			this.toolStripSeparator6.Size = new System.Drawing.Size(277, 6);
+			toolStripSeparator6.Name = "toolStripSeparator6";
+			toolStripSeparator6.Size = new System.Drawing.Size(323, 6);
 			// 
 			// プロファイル数値入力ToolStripMenuItem
 			// 
-			this.プロファイル数値入力ToolStripMenuItem.Name = "プロファイル数値入力ToolStripMenuItem";
-			this.プロファイル数値入力ToolStripMenuItem.Size = new System.Drawing.Size(280, 22);
-			this.プロファイル数値入力ToolStripMenuItem.Text = "プロファイル（数値入力）";
-			this.プロファイル数値入力ToolStripMenuItem.Click += new System.EventHandler(this.数値入力ToolStripMenuItem_Click);
+			プロファイル数値入力ToolStripMenuItem.Name = "プロファイル数値入力ToolStripMenuItem";
+			プロファイル数値入力ToolStripMenuItem.Size = new System.Drawing.Size(326, 22);
+			プロファイル数値入力ToolStripMenuItem.Text = "プロファイル（数値入力）";
+			プロファイル数値入力ToolStripMenuItem.Click += 数値入力ToolStripMenuItem_Click;
 			// 
 			// labelDisplayRate
 			// 
-			this.labelDisplayRate.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-			this.labelDisplayRate.AutoSize = true;
-			this.labelDisplayRate.ContextMenuStrip = this.contextMenuStripRate;
-			this.labelDisplayRate.Location = new System.Drawing.Point(764, 6);
-			this.labelDisplayRate.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
-			this.labelDisplayRate.Name = "labelDisplayRate";
-			this.labelDisplayRate.Size = new System.Drawing.Size(29, 12);
-			this.labelDisplayRate.TabIndex = 1;
-			this.labelDisplayRate.Text = "----";
-			this.toolTip1.SetToolTip(this.labelDisplayRate, "表示倍率。右クリックで倍率に関するコンテキストメニュー表示");
+			labelDisplayRate.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
+			labelDisplayRate.AutoSize = true;
+			labelDisplayRate.ContextMenuStrip = contextMenuStripRate;
+			labelDisplayRate.Location = new System.Drawing.Point(891, 11);
+			labelDisplayRate.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+			labelDisplayRate.Name = "labelDisplayRate";
+			labelDisplayRate.Size = new System.Drawing.Size(27, 15);
+			labelDisplayRate.TabIndex = 1;
+			labelDisplayRate.Text = "----";
+			toolTip1.SetToolTip(labelDisplayRate, "表示倍率。右クリックで倍率に関するコンテキストメニュー表示");
 			// 
 			// contextMenuStripRate
 			// 
-			this.contextMenuStripRate.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.指定倍率ToolStripMenuItem,
-            this.等倍100ToolStripMenuItem,
-            this.fitToolStripMenuItem});
-			this.contextMenuStripRate.Name = "contextMenuStripRate";
-			this.contextMenuStripRate.Size = new System.Drawing.Size(233, 70);
+			contextMenuStripRate.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { 指定倍率ToolStripMenuItem, 等倍100ToolStripMenuItem, fitToolStripMenuItem });
+			contextMenuStripRate.Name = "contextMenuStripRate";
+			contextMenuStripRate.Size = new System.Drawing.Size(191, 70);
 			// 
 			// 指定倍率ToolStripMenuItem
 			// 
-			this.指定倍率ToolStripMenuItem.Name = "指定倍率ToolStripMenuItem";
-			this.指定倍率ToolStripMenuItem.Size = new System.Drawing.Size(232, 22);
-			this.指定倍率ToolStripMenuItem.Text = "指定倍率";
-			this.指定倍率ToolStripMenuItem.Click += new System.EventHandler(this.指定倍率ToolStripMenuItem_Click);
+			指定倍率ToolStripMenuItem.Name = "指定倍率ToolStripMenuItem";
+			指定倍率ToolStripMenuItem.Size = new System.Drawing.Size(190, 22);
+			指定倍率ToolStripMenuItem.Text = "指定倍率";
+			指定倍率ToolStripMenuItem.Click += 指定倍率ToolStripMenuItem_Click;
 			// 
 			// 等倍100ToolStripMenuItem
 			// 
-			this.等倍100ToolStripMenuItem.Name = "等倍100ToolStripMenuItem";
-			this.等倍100ToolStripMenuItem.Size = new System.Drawing.Size(232, 22);
-			this.等倍100ToolStripMenuItem.Text = "等倍(100%)";
-			this.等倍100ToolStripMenuItem.Click += new System.EventHandler(this.等倍100ToolStripMenuItem_Click);
+			等倍100ToolStripMenuItem.Name = "等倍100ToolStripMenuItem";
+			等倍100ToolStripMenuItem.Size = new System.Drawing.Size(190, 22);
+			等倍100ToolStripMenuItem.Text = "等倍(100%)";
+			等倍100ToolStripMenuItem.Click += 等倍100ToolStripMenuItem_Click;
 			// 
 			// fitToolStripMenuItem
 			// 
-			this.fitToolStripMenuItem.Name = "fitToolStripMenuItem";
-			this.fitToolStripMenuItem.Size = new System.Drawing.Size(232, 22);
-			this.fitToolStripMenuItem.Text = "フィット（ダブルクリック）";
-			this.fitToolStripMenuItem.Click += new System.EventHandler(this.fitToolStripMenuItem_Click);
+			fitToolStripMenuItem.Name = "fitToolStripMenuItem";
+			fitToolStripMenuItem.Size = new System.Drawing.Size(190, 22);
+			fitToolStripMenuItem.Text = "フィット（ダブルクリック）";
+			fitToolStripMenuItem.Click += fitToolStripMenuItem_Click;
 			// 
 			// labelMouseCursor1
 			// 
-			this.labelMouseCursor1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-			this.labelMouseCursor1.AutoSize = true;
-			this.labelMouseCursor1.Font = new System.Drawing.Font("ＭＳ ゴシック", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-			this.labelMouseCursor1.Location = new System.Drawing.Point(108, 529);
-			this.labelMouseCursor1.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
-			this.labelMouseCursor1.Name = "labelMouseCursor1";
-			this.labelMouseCursor1.Size = new System.Drawing.Size(53, 12);
-			this.labelMouseCursor1.TabIndex = 2;
-			this.labelMouseCursor1.Text = "--------";
-			this.toolTip1.SetToolTip(this.labelMouseCursor1, "カーソル上の画像情報");
+			labelMouseCursor1.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left;
+			labelMouseCursor1.AutoSize = true;
+			labelMouseCursor1.Font = new System.Drawing.Font("ＭＳ ゴシック", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, 128);
+			labelMouseCursor1.Location = new System.Drawing.Point(126, 668);
+			labelMouseCursor1.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+			labelMouseCursor1.Name = "labelMouseCursor1";
+			labelMouseCursor1.Size = new System.Drawing.Size(53, 12);
+			labelMouseCursor1.TabIndex = 2;
+			labelMouseCursor1.Text = "--------";
+			toolTip1.SetToolTip(labelMouseCursor1, "カーソル上の画像情報");
 			// 
 			// contextMenuStripDispInfo
 			// 
-			this.contextMenuStripDispInfo.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.表示サイズ指定ToolStripMenuItem});
-			this.contextMenuStripDispInfo.Name = "contextMenuStripDispInfo";
-			this.contextMenuStripDispInfo.Size = new System.Drawing.Size(161, 26);
+			contextMenuStripDispInfo.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { 表示サイズ指定ToolStripMenuItem });
+			contextMenuStripDispInfo.Name = "contextMenuStripDispInfo";
+			contextMenuStripDispInfo.Size = new System.Drawing.Size(151, 26);
 			// 
 			// 表示サイズ指定ToolStripMenuItem
 			// 
-			this.表示サイズ指定ToolStripMenuItem.Name = "表示サイズ指定ToolStripMenuItem";
-			this.表示サイズ指定ToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
-			this.表示サイズ指定ToolStripMenuItem.Text = "表示サイズ指定";
-			this.表示サイズ指定ToolStripMenuItem.Click += new System.EventHandler(this.表示サイズ指定ToolStripMenuItem_Click);
+			表示サイズ指定ToolStripMenuItem.Name = "表示サイズ指定ToolStripMenuItem";
+			表示サイズ指定ToolStripMenuItem.Size = new System.Drawing.Size(150, 22);
+			表示サイズ指定ToolStripMenuItem.Text = "表示サイズ指定";
+			表示サイズ指定ToolStripMenuItem.Click += 表示サイズ指定ToolStripMenuItem_Click;
 			// 
 			// labelDispInfo
 			// 
-			this.labelDispInfo.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-			this.labelDispInfo.ContextMenuStrip = this.contextMenuStripDispInfo;
-			this.labelDispInfo.Location = new System.Drawing.Point(720, 547);
-			this.labelDispInfo.Name = "labelDispInfo";
-			this.labelDispInfo.Size = new System.Drawing.Size(130, 17);
-			this.labelDispInfo.TabIndex = 4;
-			this.labelDispInfo.Text = "[xxxxx,xxxxx]";
-			this.labelDispInfo.TextAlign = System.Drawing.ContentAlignment.TopRight;
-			this.toolTip1.SetToolTip(this.labelDispInfo, "表示ピクチャーボックス枠の大きさ[幅,高さ]。右クリックで固定値に設定可能");
+			labelDispInfo.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right;
+			labelDispInfo.ContextMenuStrip = contextMenuStripDispInfo;
+			labelDispInfo.Location = new System.Drawing.Point(840, 690);
+			labelDispInfo.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+			labelDispInfo.Name = "labelDispInfo";
+			labelDispInfo.Size = new System.Drawing.Size(152, 21);
+			labelDispInfo.TabIndex = 4;
+			labelDispInfo.Text = "[xxxxx,xxxxx]";
+			labelDispInfo.TextAlign = System.Drawing.ContentAlignment.TopRight;
+			toolTip1.SetToolTip(labelDispInfo, "表示ピクチャーボックス枠の大きさ[幅,高さ]。右クリックで固定値に設定可能");
 			// 
 			// tboxProfInfo
 			// 
-			this.tboxProfInfo.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-			this.tboxProfInfo.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-			this.tboxProfInfo.ContextMenuStrip = this.contextMenuStripProfData;
-			this.tboxProfInfo.Location = new System.Drawing.Point(292, 546);
-			this.tboxProfInfo.Name = "tboxProfInfo";
-			this.tboxProfInfo.ReadOnly = true;
-			this.tboxProfInfo.Size = new System.Drawing.Size(154, 19);
-			this.tboxProfInfo.TabIndex = 6;
-			this.tboxProfInfo.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
-			this.toolTip1.SetToolTip(this.tboxProfInfo, "右クリックで対象データの出力が可能です");
+			tboxProfInfo.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right;
+			tboxProfInfo.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+			tboxProfInfo.ContextMenuStrip = contextMenuStripProfData;
+			tboxProfInfo.Location = new System.Drawing.Point(341, 689);
+			tboxProfInfo.Margin = new System.Windows.Forms.Padding(4);
+			tboxProfInfo.Name = "tboxProfInfo";
+			tboxProfInfo.ReadOnly = true;
+			tboxProfInfo.Size = new System.Drawing.Size(179, 23);
+			tboxProfInfo.TabIndex = 6;
+			tboxProfInfo.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
+			toolTip1.SetToolTip(tboxProfInfo, "右クリックで対象データの出力が可能です");
 			// 
 			// contextMenuStripProfData
 			// 
-			this.contextMenuStripProfData.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.cSVファイル出力ToolStripMenuItem,
-            this.cSVクリップボードToolStripMenuItem,
-            this.toolStripSeparator7,
-            this.トリミングToolStripMenuItem,
-            this.数値入力ToolStripMenuItem,
-            this.画像出力VToolStripMenuItem});
-			this.contextMenuStripProfData.Name = "contextMenuStripProfData";
-			this.contextMenuStripProfData.Size = new System.Drawing.Size(203, 120);
-			this.contextMenuStripProfData.Opening += new System.ComponentModel.CancelEventHandler(this.contextMenuStripProfData_Opening);
+			contextMenuStripProfData.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { cSVファイル出力ToolStripMenuItem, cSVクリップボードToolStripMenuItem, toolStripSeparator7, トリミングToolStripMenuItem, 数値入力ToolStripMenuItem, 画像出力VToolStripMenuItem });
+			contextMenuStripProfData.Name = "contextMenuStripProfData";
+			contextMenuStripProfData.Size = new System.Drawing.Size(169, 120);
+			contextMenuStripProfData.Opening += contextMenuStripProfData_Opening;
 			// 
 			// cSVファイル出力ToolStripMenuItem
 			// 
-			this.cSVファイル出力ToolStripMenuItem.Name = "cSVファイル出力ToolStripMenuItem";
-			this.cSVファイル出力ToolStripMenuItem.Size = new System.Drawing.Size(202, 22);
-			this.cSVファイル出力ToolStripMenuItem.Text = "CSVファイル出力(&S)";
-			this.cSVファイル出力ToolStripMenuItem.Click += new System.EventHandler(this.cSVファイル出力ToolStripMenuItem_Click);
+			cSVファイル出力ToolStripMenuItem.Name = "cSVファイル出力ToolStripMenuItem";
+			cSVファイル出力ToolStripMenuItem.Size = new System.Drawing.Size(168, 22);
+			cSVファイル出力ToolStripMenuItem.Text = "CSVファイル出力(&S)";
+			cSVファイル出力ToolStripMenuItem.Click += cSVファイル出力ToolStripMenuItem_Click;
 			// 
 			// cSVクリップボードToolStripMenuItem
 			// 
-			this.cSVクリップボードToolStripMenuItem.Name = "cSVクリップボードToolStripMenuItem";
-			this.cSVクリップボードToolStripMenuItem.Size = new System.Drawing.Size(202, 22);
-			this.cSVクリップボードToolStripMenuItem.Text = "CSVクリップボード(&C)";
-			this.cSVクリップボードToolStripMenuItem.Click += new System.EventHandler(this.cSVクリップボード出力ToolStripMenuItem_Click);
+			cSVクリップボードToolStripMenuItem.Name = "cSVクリップボードToolStripMenuItem";
+			cSVクリップボードToolStripMenuItem.Size = new System.Drawing.Size(168, 22);
+			cSVクリップボードToolStripMenuItem.Text = "CSVクリップボード(&C)";
+			cSVクリップボードToolStripMenuItem.Click += cSVクリップボード出力ToolStripMenuItem_Click;
 			// 
 			// toolStripSeparator7
 			// 
-			this.toolStripSeparator7.Name = "toolStripSeparator7";
-			this.toolStripSeparator7.Size = new System.Drawing.Size(199, 6);
+			toolStripSeparator7.Name = "toolStripSeparator7";
+			toolStripSeparator7.Size = new System.Drawing.Size(165, 6);
 			// 
 			// トリミングToolStripMenuItem
 			// 
-			this.トリミングToolStripMenuItem.Name = "トリミングToolStripMenuItem";
-			this.トリミングToolStripMenuItem.Size = new System.Drawing.Size(202, 22);
-			this.トリミングToolStripMenuItem.Text = "トリミング(&T)";
-			this.トリミングToolStripMenuItem.Click += new System.EventHandler(this.トリミングToolStripMenuItem_Click);
+			トリミングToolStripMenuItem.Name = "トリミングToolStripMenuItem";
+			トリミングToolStripMenuItem.Size = new System.Drawing.Size(168, 22);
+			トリミングToolStripMenuItem.Text = "トリミング(&T)";
+			トリミングToolStripMenuItem.Click += トリミングToolStripMenuItem_Click;
 			// 
 			// 数値入力ToolStripMenuItem
 			// 
-			this.数値入力ToolStripMenuItem.Name = "数値入力ToolStripMenuItem";
-			this.数値入力ToolStripMenuItem.Size = new System.Drawing.Size(202, 22);
-			this.数値入力ToolStripMenuItem.Text = "数値入力(&N)";
-			this.数値入力ToolStripMenuItem.Click += new System.EventHandler(this.数値入力ToolStripMenuItem_Click);
+			数値入力ToolStripMenuItem.Name = "数値入力ToolStripMenuItem";
+			数値入力ToolStripMenuItem.Size = new System.Drawing.Size(168, 22);
+			数値入力ToolStripMenuItem.Text = "数値入力(&N)";
+			数値入力ToolStripMenuItem.Click += 数値入力ToolStripMenuItem_Click;
 			// 
 			// 画像出力VToolStripMenuItem
 			// 
-			this.画像出力VToolStripMenuItem.Name = "画像出力VToolStripMenuItem";
-			this.画像出力VToolStripMenuItem.Size = new System.Drawing.Size(202, 22);
-			this.画像出力VToolStripMenuItem.Text = "画像出力(&V)";
-			this.画像出力VToolStripMenuItem.Click += new System.EventHandler(this.画像出力VToolStripMenuItem_Click);
+			画像出力VToolStripMenuItem.Name = "画像出力VToolStripMenuItem";
+			画像出力VToolStripMenuItem.Size = new System.Drawing.Size(168, 22);
+			画像出力VToolStripMenuItem.Text = "画像出力(&V)";
+			画像出力VToolStripMenuItem.Click += 画像出力VToolStripMenuItem_Click;
 			// 
 			// labelMouseCursor3
 			// 
-			this.labelMouseCursor3.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-			this.labelMouseCursor3.AutoSize = true;
-			this.labelMouseCursor3.Font = new System.Drawing.Font("ＭＳ ゴシック", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-			this.labelMouseCursor3.Location = new System.Drawing.Point(108, 564);
-			this.labelMouseCursor3.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
-			this.labelMouseCursor3.Name = "labelMouseCursor3";
-			this.labelMouseCursor3.Size = new System.Drawing.Size(53, 12);
-			this.labelMouseCursor3.TabIndex = 10;
-			this.labelMouseCursor3.Text = "--------";
-			this.toolTip1.SetToolTip(this.labelMouseCursor3, "画像情報 YCrCb(0-255,-128-127,-128-127)");
+			labelMouseCursor3.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left;
+			labelMouseCursor3.AutoSize = true;
+			labelMouseCursor3.Font = new System.Drawing.Font("ＭＳ ゴシック", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, 128);
+			labelMouseCursor3.Location = new System.Drawing.Point(126, 711);
+			labelMouseCursor3.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+			labelMouseCursor3.Name = "labelMouseCursor3";
+			labelMouseCursor3.Size = new System.Drawing.Size(53, 12);
+			labelMouseCursor3.TabIndex = 10;
+			labelMouseCursor3.Text = "--------";
+			toolTip1.SetToolTip(labelMouseCursor3, "画像情報 YCrCb(0-255,-128-127,-128-127)");
 			// 
 			// labelAverageColor
 			// 
-			this.labelAverageColor.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-			this.labelAverageColor.AutoSize = true;
-			this.labelAverageColor.Font = new System.Drawing.Font("ＭＳ ゴシック", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-			this.labelAverageColor.Location = new System.Drawing.Point(290, 568);
-			this.labelAverageColor.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
-			this.labelAverageColor.Name = "labelAverageColor";
-			this.labelAverageColor.Size = new System.Drawing.Size(53, 12);
-			this.labelAverageColor.TabIndex = 2;
-			this.labelAverageColor.Text = "--------";
-			this.toolTip1.SetToolTip(this.labelAverageColor, "ラインまたはエリアの平均色をしめします");
-			// 
-			// gboxProfileMode
-			// 
-			this.gboxProfileMode.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-			this.gboxProfileMode.Controls.Add(this.rbtnProfModeBox);
-			this.gboxProfileMode.Controls.Add(this.rbtnProfModeLine);
-			this.gboxProfileMode.Controls.Add(this.rbtnProfModeOff);
-			this.gboxProfileMode.Location = new System.Drawing.Point(469, 520);
-			this.gboxProfileMode.Name = "gboxProfileMode";
-			this.gboxProfileMode.Size = new System.Drawing.Size(210, 45);
-			this.gboxProfileMode.TabIndex = 5;
-			this.gboxProfileMode.TabStop = false;
-			this.gboxProfileMode.Text = "ProfileMode";
-			// 
-			// rbtnProfModeBox
-			// 
-			this.rbtnProfModeBox.AutoSize = true;
-			this.rbtnProfModeBox.Location = new System.Drawing.Point(150, 19);
-			this.rbtnProfModeBox.Name = "rbtnProfModeBox";
-			this.rbtnProfModeBox.Size = new System.Drawing.Size(43, 16);
-			this.rbtnProfModeBox.TabIndex = 0;
-			this.rbtnProfModeBox.Text = "Box";
-			this.rbtnProfModeBox.UseVisualStyleBackColor = true;
-			this.rbtnProfModeBox.CheckedChanged += new System.EventHandler(this.OnChangeProfileMode);
-			// 
-			// rbtnProfModeLine
-			// 
-			this.rbtnProfModeLine.AutoSize = true;
-			this.rbtnProfModeLine.Location = new System.Drawing.Point(84, 18);
-			this.rbtnProfModeLine.Name = "rbtnProfModeLine";
-			this.rbtnProfModeLine.Size = new System.Drawing.Size(44, 16);
-			this.rbtnProfModeLine.TabIndex = 0;
-			this.rbtnProfModeLine.Text = "Line";
-			this.rbtnProfModeLine.UseVisualStyleBackColor = true;
-			this.rbtnProfModeLine.CheckedChanged += new System.EventHandler(this.OnChangeProfileMode);
-			// 
-			// rbtnProfModeOff
-			// 
-			this.rbtnProfModeOff.AutoSize = true;
-			this.rbtnProfModeOff.Checked = true;
-			this.rbtnProfModeOff.Location = new System.Drawing.Point(23, 18);
-			this.rbtnProfModeOff.Name = "rbtnProfModeOff";
-			this.rbtnProfModeOff.Size = new System.Drawing.Size(39, 16);
-			this.rbtnProfModeOff.TabIndex = 0;
-			this.rbtnProfModeOff.TabStop = true;
-			this.rbtnProfModeOff.Text = "Off";
-			this.rbtnProfModeOff.UseVisualStyleBackColor = true;
-			this.rbtnProfModeOff.CheckedChanged += new System.EventHandler(this.OnChangeProfileMode);
-			// 
-			// cboxFix
-			// 
-			this.cboxFix.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-			this.cboxFix.AutoSize = true;
-			this.cboxFix.Location = new System.Drawing.Point(700, 525);
-			this.cboxFix.Name = "cboxFix";
-			this.cboxFix.Size = new System.Drawing.Size(40, 16);
-			this.cboxFix.TabIndex = 7;
-			this.cboxFix.Text = "Fix";
-			this.cboxFix.UseVisualStyleBackColor = true;
-			this.cboxFix.CheckedChanged += new System.EventHandler(this.cboxFix_CheckedChanged);
-			// 
-			// labelProfSize
-			// 
-			this.labelProfSize.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-			this.labelProfSize.Location = new System.Drawing.Point(376, 518);
-			this.labelProfSize.Name = "labelProfSize";
-			this.labelProfSize.Size = new System.Drawing.Size(70, 21);
-			this.labelProfSize.TabIndex = 8;
-			this.labelProfSize.Text = "----------";
-			this.labelProfSize.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
-			// 
-			// labelMouseCursor2
-			// 
-			this.labelMouseCursor2.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-			this.labelMouseCursor2.AutoSize = true;
-			this.labelMouseCursor2.Font = new System.Drawing.Font("ＭＳ ゴシック", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-			this.labelMouseCursor2.Location = new System.Drawing.Point(108, 546);
-			this.labelMouseCursor2.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
-			this.labelMouseCursor2.Name = "labelMouseCursor2";
-			this.labelMouseCursor2.Size = new System.Drawing.Size(53, 12);
-			this.labelMouseCursor2.TabIndex = 2;
-			this.labelMouseCursor2.Text = "--------";
-			// 
-			// labelMouseCursorXY
-			// 
-			this.labelMouseCursorXY.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-			this.labelMouseCursorXY.AutoSize = true;
-			this.labelMouseCursorXY.Font = new System.Drawing.Font("ＭＳ ゴシック", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-			this.labelMouseCursorXY.Location = new System.Drawing.Point(21, 529);
-			this.labelMouseCursorXY.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
-			this.labelMouseCursorXY.Name = "labelMouseCursorXY";
-			this.labelMouseCursorXY.Size = new System.Drawing.Size(53, 12);
-			this.labelMouseCursorXY.TabIndex = 2;
-			this.labelMouseCursorXY.Text = "--------";
-			// 
-			// lblImageSize
-			// 
-			this.lblImageSize.AutoSize = true;
-			this.lblImageSize.Location = new System.Drawing.Point(87, 8);
-			this.lblImageSize.Name = "lblImageSize";
-			this.lblImageSize.Size = new System.Drawing.Size(35, 12);
-			this.lblImageSize.TabIndex = 9;
-			this.lblImageSize.Text = "-----";
-			// 
-			// label2
-			// 
-			this.label2.AutoSize = true;
-			this.label2.Location = new System.Drawing.Point(21, 8);
-			this.label2.Name = "label2";
-			this.label2.Size = new System.Drawing.Size(58, 12);
-			this.label2.TabIndex = 9;
-			this.label2.Text = "画像サイズ";
+			labelAverageColor.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right;
+			labelAverageColor.AutoSize = true;
+			labelAverageColor.Font = new System.Drawing.Font("ＭＳ ゴシック", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, 128);
+			labelAverageColor.Location = new System.Drawing.Point(338, 716);
+			labelAverageColor.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+			labelAverageColor.Name = "labelAverageColor";
+			labelAverageColor.Size = new System.Drawing.Size(53, 12);
+			labelAverageColor.TabIndex = 2;
+			labelAverageColor.Text = "--------";
+			toolTip1.SetToolTip(labelAverageColor, "ラインまたはエリアの平均色をしめします");
 			// 
 			// lblSubPx
 			// 
-			this.lblSubPx.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-			this.lblSubPx.Location = new System.Drawing.Point(720, 564);
-			this.lblSubPx.Name = "lblSubPx";
-			this.lblSubPx.Size = new System.Drawing.Size(128, 17);
-			this.lblSubPx.TabIndex = 4;
-			this.lblSubPx.Text = "(--------,--------)";
-			this.lblSubPx.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
-			this.toolTip1.SetToolTip(this.lblSubPx, "マウスカーソル位置をサブピクセル表現します");
+			lblSubPx.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right;
+			lblSubPx.Location = new System.Drawing.Point(840, 711);
+			lblSubPx.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+			lblSubPx.Name = "lblSubPx";
+			lblSubPx.Size = new System.Drawing.Size(149, 21);
+			lblSubPx.TabIndex = 4;
+			lblSubPx.Text = "(--------,--------)";
+			lblSubPx.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+			toolTip1.SetToolTip(lblSubPx, "マウスカーソル位置をサブピクセル表現します");
+			// 
+			// lblEditTitle
+			// 
+			lblEditTitle.AutoSize = true;
+			lblEditTitle.Font = new System.Drawing.Font("メイリオ", 9.75F, System.Drawing.FontStyle.Bold);
+			lblEditTitle.ForeColor = System.Drawing.Color.Red;
+			lblEditTitle.Location = new System.Drawing.Point(286, 5);
+			lblEditTitle.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+			lblEditTitle.Name = "lblEditTitle";
+			lblEditTitle.Size = new System.Drawing.Size(87, 20);
+			lblEditTitle.TabIndex = 11;
+			lblEditTitle.Text = "タイトル変更";
+			toolTip1.SetToolTip(lblEditTitle, "Ctrl + T タイトル変更");
+			lblEditTitle.Visible = false;
+			// 
+			// gboxProfileMode
+			// 
+			gboxProfileMode.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right;
+			gboxProfileMode.Controls.Add(rbtnProfModeBox);
+			gboxProfileMode.Controls.Add(rbtnProfModeLine);
+			gboxProfileMode.Controls.Add(rbtnProfModeOff);
+			gboxProfileMode.Location = new System.Drawing.Point(547, 656);
+			gboxProfileMode.Margin = new System.Windows.Forms.Padding(4);
+			gboxProfileMode.Name = "gboxProfileMode";
+			gboxProfileMode.Padding = new System.Windows.Forms.Padding(4);
+			gboxProfileMode.Size = new System.Drawing.Size(245, 56);
+			gboxProfileMode.TabIndex = 5;
+			gboxProfileMode.TabStop = false;
+			gboxProfileMode.Text = "ProfileMode";
+			// 
+			// rbtnProfModeBox
+			// 
+			rbtnProfModeBox.AutoSize = true;
+			rbtnProfModeBox.Location = new System.Drawing.Point(175, 24);
+			rbtnProfModeBox.Margin = new System.Windows.Forms.Padding(4);
+			rbtnProfModeBox.Name = "rbtnProfModeBox";
+			rbtnProfModeBox.Size = new System.Drawing.Size(45, 19);
+			rbtnProfModeBox.TabIndex = 0;
+			rbtnProfModeBox.Text = "Box";
+			rbtnProfModeBox.UseVisualStyleBackColor = true;
+			rbtnProfModeBox.CheckedChanged += OnChangeProfileMode;
+			// 
+			// rbtnProfModeLine
+			// 
+			rbtnProfModeLine.AutoSize = true;
+			rbtnProfModeLine.Location = new System.Drawing.Point(98, 22);
+			rbtnProfModeLine.Margin = new System.Windows.Forms.Padding(4);
+			rbtnProfModeLine.Name = "rbtnProfModeLine";
+			rbtnProfModeLine.Size = new System.Drawing.Size(47, 19);
+			rbtnProfModeLine.TabIndex = 0;
+			rbtnProfModeLine.Text = "Line";
+			rbtnProfModeLine.UseVisualStyleBackColor = true;
+			rbtnProfModeLine.CheckedChanged += OnChangeProfileMode;
+			// 
+			// rbtnProfModeOff
+			// 
+			rbtnProfModeOff.AutoSize = true;
+			rbtnProfModeOff.Checked = true;
+			rbtnProfModeOff.Location = new System.Drawing.Point(27, 22);
+			rbtnProfModeOff.Margin = new System.Windows.Forms.Padding(4);
+			rbtnProfModeOff.Name = "rbtnProfModeOff";
+			rbtnProfModeOff.Size = new System.Drawing.Size(41, 19);
+			rbtnProfModeOff.TabIndex = 0;
+			rbtnProfModeOff.TabStop = true;
+			rbtnProfModeOff.Text = "Off";
+			rbtnProfModeOff.UseVisualStyleBackColor = true;
+			rbtnProfModeOff.CheckedChanged += OnChangeProfileMode;
+			// 
+			// cboxFix
+			// 
+			cboxFix.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right;
+			cboxFix.AutoSize = true;
+			cboxFix.Location = new System.Drawing.Point(823, 663);
+			cboxFix.Margin = new System.Windows.Forms.Padding(4);
+			cboxFix.Name = "cboxFix";
+			cboxFix.Size = new System.Drawing.Size(41, 19);
+			cboxFix.TabIndex = 7;
+			cboxFix.Text = "Fix";
+			cboxFix.UseVisualStyleBackColor = true;
+			cboxFix.CheckedChanged += cboxFix_CheckedChanged;
+			// 
+			// labelProfSize
+			// 
+			labelProfSize.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right;
+			labelProfSize.Location = new System.Drawing.Point(439, 654);
+			labelProfSize.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+			labelProfSize.Name = "labelProfSize";
+			labelProfSize.Size = new System.Drawing.Size(82, 26);
+			labelProfSize.TabIndex = 8;
+			labelProfSize.Text = "----------";
+			labelProfSize.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+			// 
+			// labelMouseCursor2
+			// 
+			labelMouseCursor2.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left;
+			labelMouseCursor2.AutoSize = true;
+			labelMouseCursor2.Font = new System.Drawing.Font("ＭＳ ゴシック", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, 128);
+			labelMouseCursor2.Location = new System.Drawing.Point(126, 689);
+			labelMouseCursor2.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+			labelMouseCursor2.Name = "labelMouseCursor2";
+			labelMouseCursor2.Size = new System.Drawing.Size(53, 12);
+			labelMouseCursor2.TabIndex = 2;
+			labelMouseCursor2.Text = "--------";
+			// 
+			// labelMouseCursorXY
+			// 
+			labelMouseCursorXY.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left;
+			labelMouseCursorXY.AutoSize = true;
+			labelMouseCursorXY.Font = new System.Drawing.Font("ＭＳ ゴシック", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, 128);
+			labelMouseCursorXY.Location = new System.Drawing.Point(24, 668);
+			labelMouseCursorXY.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+			labelMouseCursorXY.Name = "labelMouseCursorXY";
+			labelMouseCursorXY.Size = new System.Drawing.Size(53, 12);
+			labelMouseCursorXY.TabIndex = 2;
+			labelMouseCursorXY.Text = "--------";
+			// 
+			// lblImageSize
+			// 
+			lblImageSize.AutoSize = true;
+			lblImageSize.Location = new System.Drawing.Point(102, 12);
+			lblImageSize.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+			lblImageSize.Name = "lblImageSize";
+			lblImageSize.Size = new System.Drawing.Size(32, 15);
+			lblImageSize.TabIndex = 9;
+			lblImageSize.Text = "-----";
+			// 
+			// label2
+			// 
+			label2.AutoSize = true;
+			label2.Location = new System.Drawing.Point(24, 12);
+			label2.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+			label2.Name = "label2";
+			label2.Size = new System.Drawing.Size(59, 15);
+			label2.TabIndex = 9;
+			label2.Text = "画像サイズ";
+			// 
+			// tboxEditTitle
+			// 
+			tboxEditTitle.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
+			tboxEditTitle.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+			tboxEditTitle.Font = new System.Drawing.Font("メイリオ", 9F);
+			tboxEditTitle.Location = new System.Drawing.Point(397, 1);
+			tboxEditTitle.Margin = new System.Windows.Forms.Padding(4);
+			tboxEditTitle.Name = "tboxEditTitle";
+			tboxEditTitle.Size = new System.Drawing.Size(389, 25);
+			tboxEditTitle.TabIndex = 12;
+			tboxEditTitle.Visible = false;
+			tboxEditTitle.KeyDown += tboxEditTitle_KeyDown;
+			// 
+			// btnChangeTitle
+			// 
+			btnChangeTitle.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
+			btnChangeTitle.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+			btnChangeTitle.Font = new System.Drawing.Font("メイリオ", 9F, System.Drawing.FontStyle.Bold);
+			btnChangeTitle.ForeColor = System.Drawing.Color.Red;
+			btnChangeTitle.Location = new System.Drawing.Point(798, 1);
+			btnChangeTitle.Margin = new System.Windows.Forms.Padding(4);
+			btnChangeTitle.Name = "btnChangeTitle";
+			btnChangeTitle.Size = new System.Drawing.Size(55, 29);
+			btnChangeTitle.TabIndex = 13;
+			btnChangeTitle.Text = "確定";
+			btnChangeTitle.UseVisualStyleBackColor = true;
+			btnChangeTitle.Visible = false;
+			btnChangeTitle.Click += btnChangeTitle_Click;
 			// 
 			// FormColorImageS
 			// 
-			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
-			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-			this.ClientSize = new System.Drawing.Size(884, 586);
-			this.Controls.Add(this.labelMouseCursor3);
-			this.Controls.Add(this.label2);
-			this.Controls.Add(this.lblImageSize);
-			this.Controls.Add(this.labelProfSize);
-			this.Controls.Add(this.cboxFix);
-			this.Controls.Add(this.tboxProfInfo);
-			this.Controls.Add(this.gboxProfileMode);
-			this.Controls.Add(this.lblSubPx);
-			this.Controls.Add(this.labelDispInfo);
-			this.Controls.Add(this.labelMouseCursor2);
-			this.Controls.Add(this.labelMouseCursorXY);
-			this.Controls.Add(this.labelAverageColor);
-			this.Controls.Add(this.labelMouseCursor1);
-			this.Controls.Add(this.labelDisplayRate);
-			this.Controls.Add(this.pboxColImage);
-			this.Margin = new System.Windows.Forms.Padding(2);
-			this.Name = "FormColorImageS";
-			this.Text = "画像情報画面";
-			this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.FormColorImageS_FormClosed);
-			this.Load += new System.EventHandler(this.FormColorImageS_Load);
-			this.Paint += new System.Windows.Forms.PaintEventHandler(this.FormColorImageS_Paint);
-			this.KeyDown += new System.Windows.Forms.KeyEventHandler(this.FormColorImageS_KeyDown);
-			this.KeyUp += new System.Windows.Forms.KeyEventHandler(this.FormColorImageS_KeyUp);
-			((System.ComponentModel.ISupportInitialize)(this.pboxColImage)).EndInit();
-			this.contextMenuStripL.ResumeLayout(false);
-			this.contextMenuStripRate.ResumeLayout(false);
-			this.contextMenuStripDispInfo.ResumeLayout(false);
-			this.contextMenuStripProfData.ResumeLayout(false);
-			this.gboxProfileMode.ResumeLayout(false);
-			this.gboxProfileMode.PerformLayout();
-			this.ResumeLayout(false);
-			this.PerformLayout();
-
+			AllowDrop = true;
+			AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
+			AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+			ClientSize = new System.Drawing.Size(1031, 739);
+			Controls.Add(btnChangeTitle);
+			Controls.Add(tboxEditTitle);
+			Controls.Add(lblEditTitle);
+			Controls.Add(labelMouseCursor3);
+			Controls.Add(label2);
+			Controls.Add(lblImageSize);
+			Controls.Add(labelProfSize);
+			Controls.Add(cboxFix);
+			Controls.Add(tboxProfInfo);
+			Controls.Add(gboxProfileMode);
+			Controls.Add(lblSubPx);
+			Controls.Add(labelDispInfo);
+			Controls.Add(labelMouseCursor2);
+			Controls.Add(labelMouseCursorXY);
+			Controls.Add(labelAverageColor);
+			Controls.Add(labelMouseCursor1);
+			Controls.Add(labelDisplayRate);
+			Controls.Add(pboxColImage);
+			Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
+			Margin = new System.Windows.Forms.Padding(2);
+			Name = "FormColorImageS";
+			Text = "画像情報画面";
+			FormClosed += FormColorImageS_FormClosed;
+			Load += FormColorImageS_Load;
+			DragDrop += FormMain_DragDrop;
+			DragEnter += FormMain_DragEnter;
+			Paint += FormColorImageS_Paint;
+			KeyDown += FormColorImageS_KeyDown;
+			KeyUp += FormColorImageS_KeyUp;
+			((System.ComponentModel.ISupportInitialize)pboxColImage).EndInit();
+			contextMenuStripL.ResumeLayout(false);
+			contextMenuStripRate.ResumeLayout(false);
+			contextMenuStripDispInfo.ResumeLayout(false);
+			contextMenuStripProfData.ResumeLayout(false);
+			gboxProfileMode.ResumeLayout(false);
+			gboxProfileMode.PerformLayout();
+			ResumeLayout(false);
+			PerformLayout();
 		}
 
 		#endregion
@@ -632,5 +669,8 @@
 		private System.Windows.Forms.ToolStripMenuItem cSVクリップボードToolStripMenuItem;
 		private System.Windows.Forms.ToolStripSeparator toolStripSeparator7;
 		private System.Windows.Forms.Label lblSubPx;
+		private System.Windows.Forms.Label lblEditTitle;
+		private System.Windows.Forms.TextBox tboxEditTitle;
+		private System.Windows.Forms.Button btnChangeTitle;
 	}
 }

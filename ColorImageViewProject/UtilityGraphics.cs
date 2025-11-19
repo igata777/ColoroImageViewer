@@ -16,7 +16,7 @@ namespace ColorImageViewProject
 	/// 描画ユーティリティクラスです
 	/// </summary>
 	[Serializable]
-	public class UtilityGraphics
+	public static class UtilityGraphics
 	{
 		/// <summary>
 		/// ベース色以外の色を重ね描きする
@@ -649,6 +649,27 @@ namespace ColorImageViewProject
 		}
 
 		#endregion //  ----------  内側をエッジを描画するメソッド ---------
+
+	
+		/// <summary>
+		/// DrawRectangleのfloat版拡張メソッドです</summary>
+		/// <param name="g">グラフィックス</param>
+		/// <param name="pen">ペン</param>
+		/// <param name="rect">矩形(float)</param>
+		public static void DrawRectangleF(this Graphics g, Pen pen, RectangleF rect)
+		{
+			g.DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
+		}
+
+		/// <summary>
+		/// DrawRectanglesのfloat版拡張メソッドです</summary>
+		/// <param name="g">グラフィックス</param>
+		/// <param name="pen">ペン</param>
+		/// <param name="rects">矩形(float)群</param>
+		public static void DrawRectangleFs(this Graphics g, Pen pen, RectangleF[] rects)
+		{
+			foreach (var rf in rects) g.DrawRectangle(pen, rf.X, rf.Y, rf.Width, rf.Height);
+		}
 
 
 		/// <summary>

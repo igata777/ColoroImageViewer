@@ -29,41 +29,40 @@
 		private void InitializeComponent()
 		{
 			System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FormMain));
-			this.label1 = new System.Windows.Forms.Label();
-			this.SuspendLayout();
+			label1 = new System.Windows.Forms.Label();
+			SuspendLayout();
 			// 
 			// label1
 			// 
-			this.label1.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-			this.label1.AutoSize = true;
-			this.label1.Font = new System.Drawing.Font("MS UI Gothic", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(128)));
-			this.label1.Location = new System.Drawing.Point(69, 38);
-			this.label1.Name = "label1";
-			this.label1.Size = new System.Drawing.Size(326, 16);
-			this.label1.TabIndex = 0;
-			this.label1.Text = "ここに画像イメージをドラッグアンドドロップして下さい";
-			this.label1.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+			label1.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
+			label1.AutoSize = true;
+			label1.Font = new System.Drawing.Font("MS UI Gothic", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, 128);
+			label1.Location = new System.Drawing.Point(80, 48);
+			label1.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+			label1.Name = "label1";
+			label1.Size = new System.Drawing.Size(325, 16);
+			label1.TabIndex = 0;
+			label1.Text = "ここに画像イメージをドラッグアンドドロップして下さい";
+			label1.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
 			// 
 			// FormMain
 			// 
-			this.AllowDrop = true;
-			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
-			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-			this.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Stretch;
-			this.ClientSize = new System.Drawing.Size(470, 95);
-			this.Controls.Add(this.label1);
-			this.DoubleBuffered = true;
-			this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
-			this.Name = "FormMain";
-			this.Text = "メインフォーム";
-			this.Load += new System.EventHandler(this.FormMain_Load);
-			this.DragDrop += new System.Windows.Forms.DragEventHandler(this.FormMain_DragDrop);
-			this.DragEnter += new System.Windows.Forms.DragEventHandler(this.FormMain_DragEnter);
-			this.ResumeLayout(false);
-			this.PerformLayout();
-
+			AllowDrop = true;
+			AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
+			AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+			BackgroundImageLayout = System.Windows.Forms.ImageLayout.Stretch;
+			ClientSize = new System.Drawing.Size(548, 119);
+			Controls.Add(label1);
+			DoubleBuffered = true;
+			Icon = (System.Drawing.Icon)resources.GetObject("$this.Icon");
+			Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+			Name = "FormMain";
+			Text = "メインフォーム";
+			Load += FormMain_Load;
+			DragDrop += FormMain_DragDrop;
+			DragEnter += FormMain_DragEnter;
+			ResumeLayout(false);
+			PerformLayout();
 		}
 
 		#endregion

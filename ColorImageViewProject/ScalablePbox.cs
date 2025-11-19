@@ -4,6 +4,7 @@ using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using System.Drawing.Imaging;
 using System.Reflection;
+using System.Linq;
 
 
 
@@ -11,11 +12,14 @@ using System.Reflection;
 // 2016/01/21 Copy
 // 2017/12/25 従来のFit方法(Zoom)に縦Fit, 横Fitを追加
 // 2018/08/27 Fixモード時のFitを禁止
-// 2020/01/23 Controlキー状態のトグル機能追加（デフォルトはコントロールキーを押していないときに移動拡縮操作できる）、IsSwControlがtrueになっている場合には逆の動作とする
-// 2020/02/20 マウス移動、クリックイベントにPointF(x,yのサブピクセル対応）追加
-// 2020/08/14 Controlキーにより移動拡縮が禁止される機能について、マウスホイールによる拡縮が禁止されない不具合を修正
-
-
+// 2021/02/19 Controlキー状態のトグル機能追加（デフォルトはコントロールキーを押していないときに移動拡縮操作できる）、IsSwControlがtrueになっている場合には逆の動作とする　
+// 2021/02/19 Controlキーにより移動拡縮が禁止される機能について、マウスホイールによる拡縮が禁止されない不具合を修正
+// 2021/03/25 マウス移動、クリックイベントにPointF(x,yのサブピクセル対応）追加
+// 2021/04/04 PointF系メソッド追加（要検討）
+// 2022/06/06 TransXyOrgToDispF(), TransXyOrgToDispPointsF()  を追加。リターン値がPointのものしかなかったため、PointFを返す本メソッドを追加。
+// 2023/06/14 SetMainImage()の引数がnull の場合には SetNoImage()処理を行うようにした。
+// 2023/06/19 左上の画像位置・倍率指定付きの画像をセットするメソッド（オーバーロード）を追加。 ChangeMainImage(Bitmap img, PointF posTL, float rate )
+// 2023/11/28 最小化、画面サイズ変更時の例外発生対応。　画面サイズ(Width,Height)が0の場合には、通知を行わないようにした。 NoticeDispRect()
 
 namespace ColorImageViewProject
 {
@@ -67,10 +71,10 @@ namespace ColorImageViewProject
 
 		/// <summary>表示領域が変更されたときの処理です</summary>
 		/// <remarks>Rectangle(画像領域）, bool（全体が表示されている場合true）  ret:再描画　特別に再描画が不要な場合には、リターン値をfalseにして下さい</remarks>
-		protected Func<Rectangle,bool,bool> _actionChangeRect = null;
+		protected Func<RectangleF,bool,bool> _actionChangeRect = null;
 
 		/// <summary>表示領域を保持します</summary>
-		protected Rectangle _saveDispRect;
+		protected RectangleF _saveDispRect;
 
 		/// <summary>trueの場合には、通知を行いません</summary>
 		protected bool _ignoreNoticeDispRect= false;
@@ -93,7 +97,7 @@ namespace ColorImageViewProject
 		/// <param name="chgRct">表示領域が変更されたときにその領域（画像内座標）とそれが全体(Image.Width,Height)であるかをコールバックします。 リターン値：true再描画要求</param>
 		/// <param name="onDraw">描画時内部画像への書き込みの際、書き込みGraphicsおよび画像サイズをコールバックします。 リターン値：true再描画要求</param>
 		/// <param name="isCtrlRevMode">コントロールキー反転モード</param>
-        public ScalablePbox(ScrollableControl parentform, PictureBox pbox, Func<Matrix,float,bool>onChgMat= null, Func<int,int,Color,bool,bool, PointF, bool>actPos= null, Func<int,int,Color,bool, PointF, bool>movPos=null,Func<Rectangle,bool,bool>chgRct=null, Action<Graphics,Size>onDraw= null, bool isCtrlRevMode= false )
+        public ScalablePbox(ScrollableControl parentform, PictureBox pbox, Func<Matrix,float,bool>onChgMat= null, Func<int,int,Color,bool,bool, PointF, bool>actPos= null, Func<int,int,Color,bool, PointF, bool>movPos=null,Func<RectangleF,bool,bool>chgRct=null, Action<Graphics,Size>onDraw= null, bool isCtrlRevMode= false )
 		{
 			RateNormal = 1.414213562f;			// デフォルト値：拡大・縮小率(2回で2倍）
 			RateShift = 1.071773463f;			// デフォルト値：Shit押下時の拡大・縮小率　(10回で2倍)
@@ -108,7 +112,7 @@ namespace ColorImageViewProject
 
 			_pictBox.MouseWheel += new System.Windows.Forms.MouseEventHandler(MainPictureBox_MouseWheel);
 			_onChgMat = (onChgMat != null) ? onChgMat : (Matrix Mat, float rate) => { return false; };  // nullの場合は空処理
-			_actionChangeRect = (chgRct != null) ? chgRct : (Rectangle rect, bool isall) => { return false; };  // nullの場合は空処理
+			_actionChangeRect = (chgRct != null) ? chgRct : (RectangleF rect, bool isall) => { return false; };  // nullの場合は空処理
 			_actionOnClick = actPos;
 			_actionOnMove = movPos;
 			InterpolationMode = InterpolationMode.NearestNeighbor;					// デフォルトを最近傍法とする。
@@ -140,16 +144,16 @@ namespace ColorImageViewProject
 
 		/// <summary>表示している領域を取得します</summary>
 		/// <returns>表示領域（オリジナルデータ座標）</returns>
-		public Rectangle GetDispRect()
+		public RectangleF GetDispRect()
 		{
 			if (_isNoImageMode) return new Rectangle();
 			// 表示上の座標を オリジナルデータ座標系に変換する。
-			var pov = new Point[] { new Point(0, 0), new Point(_pictBox.Width - 1, _pictBox.Height - 1) };
+			var pov = new PointF[] { new PointF(0, 0), new PointF(_pictBox.Width, _pictBox.Height) };
 			var mat = (Matrix)_mainImage.Mat.Clone();
 			mat.Invert();
 			mat.TransformPoints(pov);
 			mat.Dispose();
-			return new Rectangle(pov[0].X, pov[0].Y, (pov[1].X - pov[0].X + 1), (pov[1].Y - pov[0].Y + 1));
+			return new RectangleF(pov[0].X, pov[0].Y, (pov[1].X - pov[0].X), (pov[1].Y - pov[0].Y));
 		}
 
 
@@ -244,11 +248,12 @@ namespace ColorImageViewProject
 		/// <summary>描画領域の通知を行います</summary>
 		protected void NoticeDispRect()
 		{
-			if (_isNoImageMode) return;
+			if (_isNoImageMode || _pictBox.Width == 0 || _pictBox.Height == 0) return;
 			if (_mainImage == null || _mainImage.Bmap == null) return;
 			if (_ignoreNoticeDispRect) return;
 			// 描画領域の通知
 			var rect = GetDispRect();
+			if (DispRate <= 1.0) rect = new RectangleF((float)Math.Round(rect.X), (float)Math.Round(rect.Y), (float)Math.Round(rect.Width), (float)Math.Round(rect.Height));
 			var isAll = (_mainImage.Bmap.Width <= rect.Width) && (_mainImage.Bmap.Height <= rect.Height);
 			if (_saveDispRect != rect && _actionChangeRect != null )
 			{
@@ -461,10 +466,22 @@ namespace ColorImageViewProject
 		/// <param name="rate">倍率（指定なし＝負の値は現在の拡大率）</param>
 		public void MoveDispPos(int x, int y, int xx, int yy, float rate= -1.0f)
 		{
-			if (_isNoImageMode) return;
-			if (IsFixed && IsPowerFlag == false) return;	// Fixモード状態であれば、リターンする
+			MoveDispPos((float)x, (float)y, xx, yy, rate);
+		}
 
-			_mainImage.MoveDispPos(x, y, xx, yy, rate < 0 ? _mainImage.DispRate: rate);
+
+		/// <summary>元画像位置(x, y)を表示上座標(xx,yy)に移動する</summary>
+		/// <param name="x">データ座標x</param>
+		/// <param name="y">データ座標y</param>
+		/// <param name="xx">指定表示位置xx</param>
+		/// <param name="yy">指定表示位置yy</param>
+		/// <param name="rate">倍率（指定なし＝負の値は現在の拡大率）</param>
+		public void MoveDispPos(float x, float y, float xx, float yy, float rate = -1.0f)
+		{
+			if (_isNoImageMode) return;
+			if (IsFixed && IsPowerFlag == false) return;    // Fixモード状態であれば、リターンする
+
+			_mainImage.MoveDispPos(x, y, xx, yy, rate < 0 ? _mainImage.DispRate : rate);
 			// 画像の描画 
 			ChangedMainImageMatrix();
 			DrawMainImage();
@@ -485,12 +502,39 @@ namespace ColorImageViewProject
 		}
 
 		/// <summary>表示座標系からオリジナルデータ座標系系に変換します</summary>
+		/// <param name="dpo">表示座標系ポイント</param>
+		/// <returns>オリジナルデータ座標系ポイント</returns>
+		public PointF TransXyDispToOrgF(Point dpo)
+		{
+			// 表示上の座標を オリジナルデータ座標系に変換する。
+			var pov = new PointF[] { new PointF(dpo.X, dpo.Y) };
+			var mat = (Matrix)_mainImage.Mat.Clone();
+			mat.Invert();
+			mat.TransformPoints(pov);
+			return pov[0];
+		}
+
+		/// <summary>表示座標系からオリジナルデータ座標系系に変換します</summary>
 		/// <param name="dpos">表示座標系ポイント群</param>
 		/// <returns>オリジナルデータ座標系ポイント群</returns>
 		public Point[] TransXyDispToOrgPoints(Point[] dpos)
 		{
 			// 表示上の座標を オリジナルデータ座標系に変換する。
 			var pov = (Point[])dpos.Clone();
+			var mat = (Matrix)_mainImage.Mat.Clone();
+			mat.Invert();
+			mat.TransformPoints(pov);
+			return pov;
+		}
+
+
+		/// <summary>表示座標系からオリジナルデータ座標系系に変換します</summary>
+		/// <param name="dpos">表示座標系ポイント群</param>
+		/// <returns>オリジナルデータ座標系ポイント群</returns>
+		public PointF[] TransXyDispToOrgPointsF(Point[] dpos)
+		{
+			// 表示上の座標を オリジナルデータ座標系に変換する。
+			var pov = dpos.Select(p => new PointF(p.X, p.Y)).ToArray();
 			var mat = (Matrix)_mainImage.Mat.Clone();
 			mat.Invert();
 			mat.TransformPoints(pov);
@@ -510,6 +554,30 @@ namespace ColorImageViewProject
 		}
 
 		/// <summary>オリジナルデータ座標系から表示座標系に変換します</summary>
+		/// <param name="opo">オリジナルデータ座標系ポイント</param>
+		/// <returns>表示座標系ポイント</returns>
+		public Point TransXyOrgToDisp(PointF opo)
+		{
+			// オリジナルデータ座標系の座標を 表示上の座標系に変換する。
+			var pov = new PointF[] { new PointF(opo.X, opo.Y) };
+			_mainImage.Mat.TransformPoints(pov);
+			return new Point((int)pov[0].X, (int)pov[0].Y);
+		}
+
+
+		/// <summary>オリジナルデータ座標系から表示座標系に変換します</summary>
+		/// <param name="opo">オリジナルデータ座標系ポイント</param>
+		/// <returns>表示座標系ポイント</returns>
+		public PointF TransXyOrgToDispF(PointF opo)
+		{
+			// オリジナルデータ座標系の座標を 表示上の座標系に変換する。
+			var pov = new PointF[] { new PointF(opo.X, opo.Y) };
+			_mainImage.Mat.TransformPoints(pov);
+			return new PointF((float)pov[0].X, (float)pov[0].Y);
+		}
+
+
+		/// <summary>オリジナルデータ座標系から表示座標系に変換します</summary>
 		/// <param name="opos">オリジナルデータ座標系ポイント群</param>
 		/// <returns>表示座標系ポイント群</returns>
 		public Point[] TransXyOrgToDispPoints(Point[] opos)
@@ -520,11 +588,44 @@ namespace ColorImageViewProject
 			return pov;
 		}
 
+		/// <summary>オリジナルデータ座標系から表示座標系に変換します</summary>
+		/// <param name="opos">オリジナルデータ座標系ポイント群</param>
+		/// <returns>表示座標系ポイント群</returns>
+		public Point[] TransXyOrgToDispPoints(PointF[] opos)
+		{
+			// オリジナルデータ座標系の座標を 表示上の座標系に変換する。
+			var pov = opos.Select(p => new PointF(p.X, p.Y)).ToArray();
+			_mainImage.Mat.TransformPoints(pov);
+			return pov.Select(pf => new Point((int)pf.X, (int)pf.Y)).ToArray();
+		}
 
-        /// <summary>マウスボタンがクリック(DOWN)したときの処理です</summary>
-        /// <param name="sender">イベント発信元</param>
-        /// <param name="e">イベント引数</param>
-        protected void MainPictureBox_MouseDown(object sender, MouseEventArgs e)
+
+		/// <summary>オリジナルデータ座標系から表示座標系に変換します</summary>
+		/// <param name="opos">オリジナルデータ座標系ポイント群</param>
+		/// <returns>表示座標系ポイント群</returns>
+		public PointF[] TransXyOrgToDispPointsF(Point[] opos)
+		{
+			// オリジナルデータ座標系の座標を 表示上の座標系に変換する。
+			var pov = (PointF[])opos.Clone();
+			_mainImage.Mat.TransformPoints(pov);
+			return pov;
+		}
+
+		/// <summary>オリジナルデータ座標系から表示座標系に変換します</summary>
+		/// <param name="opos">オリジナルデータ座標系ポイント群</param>
+		/// <returns>表示座標系ポイント群</returns>
+		public PointF[] TransXyOrgToDispPointsF(PointF[] opos)
+		{
+			// オリジナルデータ座標系の座標を 表示上の座標系に変換する。
+			var pov = opos.Select(p => new PointF(p.X, p.Y)).ToArray();
+			_mainImage.Mat.TransformPoints(pov);
+			return pov.Select(pf => new PointF((float)pf.X, (float)pf.Y)).ToArray();
+		}
+
+		/// <summary>マウスボタンがクリック(DOWN)したときの処理です</summary>
+		/// <param name="sender">イベント発信元</param>
+		/// <param name="e">イベント引数</param>
+		protected void MainPictureBox_MouseDown(object sender, MouseEventArgs e)
         {
 			bool isRedraw = false;
 			if (_isNoImageMode) return;
@@ -545,7 +646,7 @@ namespace ColorImageViewProject
 				var xx = (int)Math.Round(pt[0].X);
 				var yy = (int)Math.Round(pt[0].Y);
 				// クリックした位置が、画像内であれば画像情報をステータスバーに表示する。そうでなければリターンし、ダウンフラグはセットしない。
-				if (_mainImage != null && _mainImage.Bmap != null && pt[0].X >= 0 && pt[0].X < _mainImage.Bmap.Width && pt[0].Y >= 0 && pt[0].Y < _mainImage.Bmap.Height)
+				if (_mainImage != null && _mainImage.Bmap != null && xx >= 0 && xx < _mainImage.Bmap.Width && yy >= 0 && yy < _mainImage.Bmap.Height)
 				{
 					Color c = _mainImage.Bmap.GetPixel(xx, yy);
 
@@ -682,10 +783,11 @@ namespace ColorImageViewProject
 
 
 		/// <summary>メインピクチャーボックスのイメージ変更</summary>
-		/// <param name="img"></param>
+		/// <param name="img"> 表示対象画像</param>
 		public void ChangeMainImage(Bitmap img)
 		{
-//            DevelopLog.LogINF(MethodBase.GetCurrentMethod(), String.Format("メインのイメージが切り替え。 サイズ({0},{1}), 解像度({2:##0.0},{3:##0.0})", img.Width, img.Height, img.HorizontalResolution, img.VerticalResolution));
+			//            DevelopLog.LogINF(MethodBase.GetCurrentMethod(), String.Format("メインのイメージが切り替え。 サイズ({0},{1}), 解像度({2:##0.0},{3:##0.0})", img.Width, img.Height, img.HorizontalResolution, img.VerticalResolution));
+			if (img == null) { SetNoImage(); return; }
 			_isNoImageMode = false;
 			_mainImage.Bmap = img;
 			DrawMainImage();
@@ -698,14 +800,35 @@ namespace ColorImageViewProject
 
 
 		/// <summary>メインピクチャーボックスのイメージ変更</summary>
-		/// <param name="img"></param>
-		/// <param name="mat"></param>
+		/// <param name="img"> 表示対象画像</param>
+		/// <param name="mat">表示Matrix</param>
 		public void ChangeMainImage(Bitmap img, Matrix mat)
 		{
 			//            DevelopLog.LogINF(MethodBase.GetCurrentMethod(), String.Format("メインのイメージが切り替え。 サイズ({0},{1}), 解像度({2:##0.0},{3:##0.0})", img.Width, img.Height, img.HorizontalResolution, img.VerticalResolution));
+			if (img == null) { SetNoImage(); return; }
 			_isNoImageMode = false;
 			_mainImage.Bmap = img;
 			_mainImage.Mat = mat;
+			DrawMainImage();
+			ChangedMainImageMatrix();
+			// 描画領域の通知
+			_saveDispRect = new Rectangle();
+			NoticeDispRect();
+		}
+
+
+
+		/// <summary>メインピクチャーボックスのイメージ変更</summary>
+		/// <param name="img"> 表示対象画像</param>
+		/// <param name="posTL">左上に表示する元画像座標</param>
+		/// <param name="rate">倍率</param>
+		/// <remarks>posTLに対する取得メソッドは TransXyDispToOrgF()  </remarks>
+		public void ChangeMainImage(Bitmap img, PointF posTL, float rate )
+		{
+			if (img == null) { SetNoImage(); return; }
+			_isNoImageMode = false;
+			_mainImage.Bmap = img;
+			_mainImage.MoveDispPos(posTL.X, posTL.Y, 0f, 0f, rate );
 			DrawMainImage();
 			ChangedMainImageMatrix();
 			// 描画領域の通知
@@ -1017,23 +1140,43 @@ namespace ColorImageViewProject
         /// <returns>指定したポイントx,yが描画イメージ上にあるときtrue</returns>
         public bool IsPointOnImage(int x, int y)
         {
+			return IsPointOnImage((float)x, (float)y);
+		}
+
+		/// <summary>指定したポイントx,yが描画イメージ上にあるか調べる </summary>
+		/// <param name="x">調べるポイントX座標</param>
+		/// <param name="y">調べるポイントY座標</param>
+		/// <returns>指定したポイントx,yが描画イメージ上にあるときtrue</returns>
+		public bool IsPointOnImage(float x, float y)
+		{
 			if (_bmap == null) return false;
-			Point[] px = { new Point(0, 0), new Point(_bmap.Width, _bmap.Height) };
-            _mat.TransformPoints(px);
-            return (x >= px[0].X && x <= px[1].X && y >= px[0].Y && y <= px[1].Y);
-        }
+			PointF[] px = { new PointF(0, 0), new PointF(_bmap.Width, _bmap.Height) };
+			_mat.TransformPoints(px);
+			return (x >= px[0].X && x <= px[1].X && y >= px[0].Y && y <= px[1].Y);
+		}
 
 
 		/// <summary>表示倍率を指定された分UpまたはDownします</summary>
 		/// <param name="x">中心位置 x</param>
 		/// <param name="y">中心位置 y</param>
 		/// <param name="ratedif">(拡大率の）増減</param>
-        /// <returns>中心位置が画像上にあった場合には真を返す</returns>
-        /// <remarks>現在の表示倍率を5%UP （拡大）ならば, ratedif=0.05とします</remarks>
+		/// <returns>中心位置が画像上にあった場合には真を返す</returns>
+		/// <remarks>現在の表示倍率を5%UP （拡大）ならば, ratedif=0.05とします</remarks>
 		public bool ChangeScaleDif(int x, int y, float ratedif)
 		{
+			return ChangeScaleDif((float)x, (float)y, ratedif);
+		}
+
+		/// <summary>表示倍率を指定された分UpまたはDownします</summary>
+		/// <param name="x">中心位置 x</param>
+		/// <param name="y">中心位置 y</param>
+		/// <param name="ratedif">(拡大率の）増減</param>
+		/// <returns>中心位置が画像上にあった場合には真を返す</returns>
+		/// <remarks>現在の表示倍率を5%UP （拡大）ならば, ratedif=0.05とします</remarks>
+		public bool ChangeScaleDif(float x, float y, float ratedif)
+		{
 			if (IsFixed && !IsPowerFlag) return false;
-            bool onf = IsPointOnImage(x, y);
+			bool onf = IsPointOnImage(x, y);
 			// 中心位置→原点へ移動 
 			_mat.Translate(-x, -y, System.Drawing.Drawing2D.MatrixOrder.Append);
 
@@ -1042,8 +1185,7 @@ namespace ColorImageViewProject
 			// 原点→ポインタの位置へ移動(元の位置へ戻す) 
 			_mat.Translate(x, y, System.Drawing.Drawing2D.MatrixOrder.Append);
 
-            return onf;
-
+			return onf;
 		}
 
 
@@ -1052,7 +1194,7 @@ namespace ColorImageViewProject
 		/// <param name="y">中心位置 y</param>
 		/// <param name="rateR">拡大</param>
 		/// <param name="powerFlag">強制フラグ(IsFixedでも実行する）</param>
-        /// <returns>中心位置が画像上にあった場合には真を返す</returns>
+		/// <returns>中心位置が画像上にあった場合には真を返す</returns>
 		/// <remarks>現在の表示倍率2倍（拡大）ならば, rateR=2.0f,半分にするときは rateR= 0.5とします</remarks>
 		public bool ChangeScaleRate(int x, int y, float rateR, bool powerFlag= false )
 		{
@@ -1069,6 +1211,28 @@ namespace ColorImageViewProject
 			_mat.Translate(x, y, System.Drawing.Drawing2D.MatrixOrder.Append);
             return onf;
 		}
+		/// <summary>現在の表示を指定倍率拡大します</summary>
+		/// <param name="x">中心位置 x</param>
+		/// <param name="y">中心位置 y</param>
+		/// <param name="rateR">拡大</param>
+		/// <param name="powerFlag">強制フラグ(IsFixedでも実行する）</param>
+		/// <returns>中心位置が画像上にあった場合には真を返す</returns>
+		/// <remarks>現在の表示倍率2倍（拡大）ならば, rateR=2.0f,半分にするときは rateR= 0.5とします</remarks>
+		public bool ChangeScaleRate(float x, float y, float rateR, bool powerFlag = false)
+		{
+			if (Bmap == null) return false;
+			//			float rate1 = 1.41421356f;			// 1回の拡大・縮小率
+			if ((IsFixed && !IsPowerFlag) && powerFlag == false) return false;
+			bool onf = IsPointOnImage(x, y);
+			// 中心位置→原点へ移動 
+			_mat.Translate(-x, -y, System.Drawing.Drawing2D.MatrixOrder.Append);
+
+			AdjustScaleRate(_mat.Elements[0] * rateR);
+
+			// 原点→ポインタの位置へ移動(元の位置へ戻す) 
+			_mat.Translate(x, y, System.Drawing.Drawing2D.MatrixOrder.Append);
+			return onf;
+		}
 
 
 		/// <summary>元画像位置(x, y)を中央に移動する</summary>
@@ -1076,7 +1240,15 @@ namespace ColorImageViewProject
 		/// <param name="y"></param>
 		public void MoveCenterPos(int x, int y)
 		{
-			var rate = _mat.Elements[0];		// 縦横同比率が前提
+			MoveCenterPos((float)x, (float)y);
+		}
+
+		/// <summary>元画像位置(x, y)を中央に移動する</summary>
+		/// <param name="x"></param>
+		/// <param name="y"></param>
+		public void MoveCenterPos(float x, float y)
+		{
+			var rate = _mat.Elements[0];        // 縦横同比率が前提
 			MoveDispPos(x, y, _pbox.Width / 2, _pbox.Height / 2, rate);
 		}
 
@@ -1089,15 +1261,25 @@ namespace ColorImageViewProject
 		/// <remarks>倍率は現在の倍率</remarks>
 		public void MoveDispPos(int x, int y, int xx, int yy, float rate )
 		{
-			_mat.Reset();
-			_mat.Translate(-x, -y, MatrixOrder.Append);
-			_mat.Scale(rate, rate, MatrixOrder.Append);			// 縦横同比率が前提
-			_mat.Translate(xx, yy, MatrixOrder.Append );
+			MoveDispPos((float)x, (float)y, (float)xx, (float)yy, rate);
 		}
 
+		/// <summary>元画像位置(x, y)を表示上座標(xx,yy)に移動する</summary>
+		/// <param name="x">データ座標x</param>
+		/// <param name="y">データ座標y</param>
+		/// <param name="xx">指定表示位置xx</param>
+		/// <param name="yy">指定表示位置yy</param>
+		/// <remarks>倍率は現在の倍率</remarks>
+		public void MoveDispPos(float x, float y, float xx, float yy, float rate)
+		{
+			_mat.Reset();
+			_mat.Translate(-x, -y, MatrixOrder.Append);
+			_mat.Scale(rate, rate, MatrixOrder.Append);         // 縦横同比率が前提
+			_mat.Translate(xx, yy, MatrixOrder.Append);
+		}
 
-        /// <summary>表示位置を調整する</summary>
-        public void AdjustImagePosition(PictureBox Pbox)
+		/// <summary>表示位置を調整する</summary>
+		public void AdjustImagePosition(PictureBox Pbox)
         {
  			if (Bmap== null) return;
 			if (IsFixed && !IsPowerFlag) return;            // Fixモードの場合には調整を行わない
