@@ -185,7 +185,7 @@ namespace ColorImageViewProject
 					ret = true;
 				}
 			}
-			catch (Exception ex)
+			catch
 			{
 				MessageBox.Show("CSVファイルの書き込みに失敗しました", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
 				ret = false;

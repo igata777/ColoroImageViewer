@@ -579,7 +579,7 @@ namespace IAPLibrary
 				//OKボタンがクリックされたとき
 				// 拡張子に強制的にあわせる場合には、ここにコードを入れること（現在はインデックスにより決定される）
 				var it = new ImageFormat[] { ImageFormat.Png, ImageFormat.Jpeg, ImageFormat.Bmp, ImageFormat.Tiff };
-				ImageFormat fmt = (sfd.FilterIndex > 0 && sfd.FilterIndex < it.Length) ? it[sfd.FilterIndex - 1] : ImageFormat.Png;
+				ImageFormat fmt = (sfd.FilterIndex > 0 && sfd.FilterIndex <= it.Length) ? it[sfd.FilterIndex - 1] : ImageFormat.Png;
 				_originalImage.Save(sfd.FileName, fmt);
 			}
 		}
@@ -693,7 +693,7 @@ namespace IAPLibrary
 				//OKボタンがクリックされたとき
 				// 拡張子に強制的にあわせる場合には、ここにコードを入れること（現在はインデックスにより決定される）
 				var it = new ImageFormat[] { ImageFormat.Png, ImageFormat.Jpeg, ImageFormat.Bmp, ImageFormat.Tiff };
-				ImageFormat fmt = (sfd.FilterIndex > 0 && sfd.FilterIndex < it.Length) ? it[sfd.FilterIndex - 1] : ImageFormat.Png;
+				ImageFormat fmt = (sfd.FilterIndex > 0 && sfd.FilterIndex <= it.Length) ? it[sfd.FilterIndex - 1] : ImageFormat.Png;
 				_resultImage.Save(sfd.FileName, fmt);
 			}
 

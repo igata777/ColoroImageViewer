@@ -43,12 +43,10 @@ namespace ColorImageViewer
 				}
 
 				// 引数がある場合には、それらがすべて閉じられるまで透明フォームとして存在する。画像表示フォームから抜ける場合には OnClosedImageForm が呼ばれるようにしておく。
-				var bmps = args.Select(fp => new { Bmp = UtilityGraphics.LoadBitmapPF(fp, PixelFormat.Format24bppRgb), Fn = Path.GetFileName(fp) });
-				var frms = bmps.Select(w => new FormColorImageS(w.Bmp, Path.GetFileName(w.Fn), false, -1, -1, null, null, this.Icon, OnClosedImageForm)).ToArray();
-				_count = frms.Length;
-				foreach (var frm in frms)
+				_count = OpenImageForms(args, OnClosedImageForm);
+				if (_count == 0)
 				{
-					frm.Show();
+					MessageBox.Show("有効な画像ファイルが見つかりませんでした。");
 				}
 			}
 			catch (Exception ex)
@@ -98,37 +96,39 @@ namespace ColorImageViewer
 		/// <param name="isInit">初期化時フラグ</param>
         public void OpenFiles(string[] filePaths, bool isInit)
         {
-            var validImageFiles = filePaths.Where(IsImageFile).ToArray();
+            var openCount = OpenImageForms(filePaths, OnClosedImageForm);
 
-            if (validImageFiles.Length == 0)
+            if (openCount == 0)
             {
                 MessageBox.Show("有効な画像ファイルが見つかりませんでした。");
                 return;
             }
 
-            // 引数がある場合には、それらがすべて閉じられるまで透明フォームとして存在する。画像表示フォームから抜ける場合には OnClosedImageForm が呼ばれるようにしておく。
-            var bmps = filePaths.Select(fp => new { Bmp = UtilityGraphics.LoadBitmapPF(fp, PixelFormat.Format24bppRgb), Fn = Path.GetFileName(fp) });
-            var frms = bmps.Select(w => new FormColorImageS(w.Bmp, Path.GetFileName(w.Fn), false, -1, -1, null, null, this.Icon, OnClosedImageForm)).ToArray();
-            if( _count> 0 || isInit ) _count += frms.Length;
-            foreach (var frm in frms)
-            {
-                frm.Show();
-            }
+            if( _count> 0 || isInit ) _count += openCount;
 
 			SetFormVisible();
         }
 
 
 		/// <summary>
-		/// 拡張子が対象の画像ファイルであるか判定を行います</summary>
-		/// <param name="filePath">ファイルパス</param>
-		/// <returns>対象画像ファイルである場合、true</returns>
-        private bool IsImageFile(string filePath)
+		/// 指定された画像ファイル群を表示フォームとして開きます</summary>
+		/// <param name="filePaths">ファイルパス群</param>
+		/// <param name="onClosed">表示フォームクローズ時に呼び出すアクション</param>
+		/// <returns>開いたフォーム数</returns>
+        private int OpenImageForms(IEnumerable<string> filePaths, Action onClosed)
         {
-            if (!File.Exists(filePath)) return false;
-
-            var extension = Path.GetExtension(filePath).ToLower();
-            return new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tiff", ".webp" }.Contains(extension);
+            var images = UtilityGraphics.LoadBitmapFilesPF(filePaths, PixelFormat.Format24bppRgb);
+            var openCount = 0;
+            foreach (var image in images)
+            {
+                using (image.Bmp)
+                {
+                    var frm = new FormColorImageS(image.Bmp, image.FileName, false, -1, -1, null, null, this.Icon, onClosed);
+                    frm.Show();
+                    openCount++;
+                }
+            }
+            return openCount;
         }
 
 
@@ -154,10 +154,14 @@ namespace ColorImageViewer
 			if (e.Data.GetDataPresent(DataFormats.FileDrop))
 			{
 				var args = (string[])e.Data.GetData(DataFormats.FileDrop);
-				var bmps = args.Select(fp => new { Bmp = UtilityGraphics.LoadBitmapPF(fp, PixelFormat.Format24bppRgb), Fn = Path.GetFileName(fp) }) ;
-				var frms = bmps.Select(w => new FormColorImageS(w.Bmp, Path.GetFileName(w.Fn), false, -1, -1, null, null, this.Icon, OnClosedImageForm)).ToArray();
-				if( _count > 0 ) _count += frms.Length;
-				foreach (var frm in frms) frm.Show();
+				var openCount = OpenImageForms(args, OnClosedImageForm);
+				if (openCount == 0)
+				{
+					MessageBox.Show("有効な画像ファイルが見つかりませんでした。");
+					return;
+				}
+				if( _count > 0 ) _count += openCount;
+				SetFormVisible();
 			}
 		}
 

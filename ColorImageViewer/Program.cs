@@ -51,11 +51,11 @@ namespace ColorImageViewer
         {
             Task.Run(async () =>
             {
-                while (true)
+                while (!mainForm.IsDisposed)
                 {
                     try
                     {
-                        using (var server = new NamedPipeServerStream("MyImageViewerPipe"))
+                        using (var server = new NamedPipeServerStream("MyImageViewerPipe", PipeDirection.In))
                         {
                             await server.WaitForConnectionAsync();
 
@@ -63,6 +63,7 @@ namespace ColorImageViewer
                             {
                                 var jsonMessage = await reader.ReadToEndAsync();
                                 var message = JsonSerializer.Deserialize<PipeMessage>(jsonMessage);
+								if (message == null) continue;
 
 								if (!mainForm.IsDisposed && mainForm.IsHandleCreated)
 								{

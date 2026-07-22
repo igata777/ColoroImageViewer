@@ -274,9 +274,21 @@ namespace ColorImageViewProject
                 if (e.Data.GetDataPresent(DataFormats.FileDrop))
                 {
                     var args = (string[])e.Data.GetData(DataFormats.FileDrop);
-                    var bmps = args.Select(fp => new { Bmp = UtilityGraphics.LoadBitmapPF(fp, PixelFormat.Format24bppRgb), Fn = Path.GetFileName(fp) });
-                    var frms = bmps.Select(w => new FormColorImageS(w.Bmp, Path.GetFileName(w.Fn), false, -1, -1, null, null, this.Icon)).ToArray();
-                    foreach (var frm in frms) frm.Show();
+                    var images = UtilityGraphics.LoadBitmapFilesPF(args, PixelFormat.Format24bppRgb);
+                    if (images.Length == 0)
+                    {
+                        MessageBox.Show("有効な画像ファイルが見つかりませんでした。", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+
+                    foreach (var image in images)
+                    {
+                        using (image.Bmp)
+                        {
+                            var frm = new FormColorImageS(image.Bmp, image.FileName, false, -1, -1, null, null, this.Icon);
+                            frm.Show();
+                        }
+                    }
                 }
             }
             catch
@@ -625,7 +637,7 @@ namespace ColorImageViewProject
 				//OKボタンがクリックされたとき
 				// 拡張子に強制的にあわせる場合には、ここにコードを入れること（現在はインデックスにより決定される）
 				var it = new ImageFormat[] { ImageFormat.Png, ImageFormat.Jpeg, ImageFormat.Bmp, ImageFormat.Tiff };
-				ImageFormat fmt = (sfd.FilterIndex > 0 && sfd.FilterIndex < it.Length) ? it[sfd.FilterIndex - 1] : ImageFormat.Png;
+				ImageFormat fmt = (sfd.FilterIndex > 0 && sfd.FilterIndex <= it.Length) ? it[sfd.FilterIndex - 1] : ImageFormat.Png;
 				bmp.Save(sfd.FileName, fmt);
 			}
 		}
@@ -1222,16 +1234,18 @@ namespace ColorImageViewProject
 		private void 表示枠情報を別の画像情報画面に表示ToolStripMenuItem_Click(object sender, EventArgs e)
 		{
 			if( _sourceImage== null ) return;
-			var bmp = _sourceImage.Clone(new Rectangle(0, 0, _sourceImage.Width, _sourceImage.Height), PixelFormat.Format24bppRgb);
-			using (var gra = Graphics.FromImage(bmp))
-			using (var pen = new Pen(Color.Red, 3.0f) { Alignment = PenAlignment.Outset })
+			using (var bmp = _sourceImage.Clone(new Rectangle(0, 0, _sourceImage.Width, _sourceImage.Height), PixelFormat.Format24bppRgb))
 			{
-				// 表示領域の太線はPenAlignmentは外側に描画するためOutsetを指定（ただし.NETの不具合で Outsetでも中央描画してしまうとのこと2022.04.01現在）
-				pen.Alignment = PenAlignment.Outset;	
-				gra.DrawRectangleFs(pen, new[] { _scalePbox.GetDispRect() });
+				using (var gra = Graphics.FromImage(bmp))
+				using (var pen = new Pen(Color.Red, 3.0f) { Alignment = PenAlignment.Outset })
+				{
+					// 表示領域の太線はPenAlignmentは外側に描画するためOutsetを指定（ただし.NETの不具合で Outsetでも中央描画してしまうとのこと2022.04.01現在）
+					pen.Alignment = PenAlignment.Outset;	
+					gra.DrawRectangleFs(pen, new[] { _scalePbox.GetDispRect() });
+				}
+				var frm = new FormColorImageS(bmp, this.Text + "表示領域", false, -1, -1, null, _settings);
+				frm.Show();
 			}
-			var frm = new FormColorImageS(bmp, this.Text + "表示領域", false, -1, -1, null, _settings);
-			frm.Show();
 
 		}
 
@@ -1358,8 +1372,11 @@ namespace ColorImageViewProject
 		[SupportedOSPlatform("windows")]
 		private void CrossCursor(Graphics g, Point po, float siz, Color col, float wid)
 		{
-			g.DrawLine(new Pen(col, wid), po.X - siz / 2.0f, po.Y, po.X + siz / 2, po.Y);
-			g.DrawLine(new Pen(col, wid), po.X, po.Y - siz / 2.0f, po.X, po.Y + siz / 2.0f);
+			using (var pen = new Pen(col, wid))
+			{
+				g.DrawLine(pen, po.X - siz / 2.0f, po.Y, po.X + siz / 2, po.Y);
+				g.DrawLine(pen, po.X, po.Y - siz / 2.0f, po.X, po.Y + siz / 2.0f);
+			}
 		}
 
 
@@ -1377,32 +1394,36 @@ namespace ColorImageViewProject
 		[SupportedOSPlatform("windows")]
 		private void DispMeasureCursor(Graphics g, Point pob, Point poe, Color col, float wid, float pcSiz, bool isLine)
 		{
-			Pen pen = new Pen(col, wid);
-			pen.StartCap = pen.EndCap = LineCap.ArrowAnchor;
-
-			// モードによりLineまたはRectangleを描画する
-			if (isLine)
+			using (var pen = new Pen(col, wid))
 			{
-				g.DrawLine(pen, pob, poe);
-				if (_pcLine != null)
+				pen.StartCap = pen.EndCap = LineCap.ArrowAnchor;
+
+				// モードによりLineまたはRectangleを描画する
+				if (isLine)
 				{
-					var xx = (double)(poe.X - pob.X);
-					var yy = (double)(poe.Y - pob.Y);
-					var ww = Math.Sqrt(xx * xx + yy * yy);
-					xx /= ww;
-					yy /= ww;
-					var rr = new RectangleF( pob.X + (float)(xx * _pcLine.Value) - pcSiz, pob.Y + (float)(yy * _pcLine.Value) - pcSiz, pcSiz * 2, pcSiz * 2 );
-					g.FillRectangle(Brushes.Orange, rr); 
+					g.DrawLine(pen, pob, poe);
+					if (_pcLine != null)
+					{
+						var xx = (double)(poe.X - pob.X);
+						var yy = (double)(poe.Y - pob.Y);
+						var ww = Math.Sqrt(xx * xx + yy * yy);
+						xx /= ww;
+						yy /= ww;
+						var rr = new RectangleF( pob.X + (float)(xx * _pcLine.Value) - pcSiz, pob.Y + (float)(yy * _pcLine.Value) - pcSiz, pcSiz * 2, pcSiz * 2 );
+						g.FillRectangle(Brushes.Orange, rr); 
 
+					}
 				}
-			}
-			else
-			{
-				var penC = new Pen(Color.Orange, wid);
-				var rect = CreateFRectFromMeasurePoint(pob, poe); // 描画用
-				g.DrawRectangle(pen, rect);
-				if (_pcBoxH != null) g.DrawLine(penC, rect.X + _pcBoxH.Value, rect.Y, rect.X + _pcBoxH.Value, rect.Y + rect.Height);
-				if (_pcBoxV != null) g.DrawLine(penC, rect.X, rect.Y + _pcBoxV.Value, rect.X + rect.Width, rect.Y + _pcBoxV.Value);
+				else
+				{
+					using (var penC = new Pen(Color.Orange, wid))
+					{
+						var rect = CreateFRectFromMeasurePoint(pob, poe); // 描画用
+						g.DrawRectangle(pen, rect);
+						if (_pcBoxH != null) g.DrawLine(penC, rect.X + _pcBoxH.Value, rect.Y, rect.X + _pcBoxH.Value, rect.Y + rect.Height);
+						if (_pcBoxV != null) g.DrawLine(penC, rect.X, rect.Y + _pcBoxV.Value, rect.X + rect.Width, rect.Y + _pcBoxV.Value);
+					}
+				}
 			}
 		}
 
@@ -1666,9 +1687,9 @@ namespace ColorImageViewProject
 					}
 					return ret;
 				}
-				catch (Exception e)
+				catch
 				{
-					throw e;
+					throw;
 				}
 				finally
 				{
@@ -1722,9 +1743,9 @@ namespace ColorImageViewProject
 					}
 					return ret;
 				}
-				catch (Exception e)
+				catch
 				{
-					throw e;
+					throw;
 				}
 				finally
 				{
@@ -1776,9 +1797,9 @@ namespace ColorImageViewProject
 
 					return ret;
 				}
-				catch (Exception e)
+				catch
 				{
-					throw e;
+					throw;
 				}
 				finally
 				{
@@ -1834,9 +1855,9 @@ namespace ColorImageViewProject
 							return Color.FromArgb(sp[2], sp[1], sp[0]);			// sp・・B,G,Rの順
 						}).ToArray();
 				}
-				catch (Exception e)
+				catch
 				{
-					throw e;
+					throw;
 				}
 				finally
 				{
@@ -2131,9 +2152,11 @@ namespace ColorImageViewProject
 			// 開始点、終了点から矩形を生成する。
 			var rect = CreateRectFromMeasurePoint(_measureModePointB.Value, _measureModePointE.Value);
 
-			var bmp = _sourceImage.Clone(rect, PixelFormat.Format24bppRgb);
-			var frm = new FormColorImageS(bmp, String.Format("トリミング {0}", rect.ToString()).Replace( ',', '_'), false, -1, -1, null, null, this.Icon);
-			frm.Show();
+			using (var bmp = _sourceImage.Clone(rect, PixelFormat.Format24bppRgb))
+			{
+				var frm = new FormColorImageS(bmp, String.Format("トリミング {0}", rect.ToString()).Replace( ',', '_'), false, -1, -1, null, null, this.Icon);
+				frm.Show();
+			}
 		}
 
 
@@ -2177,7 +2200,7 @@ namespace ColorImageViewProject
 		{
 			try
 			{
-				var dic = new Dictionary<string, ImageFormat>() { { ".PNG", ImageFormat.Png }, { ".BMP", ImageFormat.Bmp }, { ".JPG", ImageFormat.Jpeg } };
+				var dic = new Dictionary<string, ImageFormat>() { { ".PNG", ImageFormat.Png }, { ".BMP", ImageFormat.Bmp }, { ".JPG", ImageFormat.Jpeg }, { ".JPEG", ImageFormat.Jpeg } };
 				var sfd = new SaveFileDialog();
 
 				sfd.FileName = defname;
@@ -2190,7 +2213,7 @@ namespace ColorImageViewProject
 				{
 					var imgfmt = ImageFormat.Jpeg;
 					if (dic.TryGetValue(Path.GetExtension(sfd.FileName).ToUpper(), out ImageFormat imf)) imgfmt = imf;
-					bmp.Save(sfd.FileName, imf);
+					bmp.Save(sfd.FileName, imgfmt);
 				}
 			}
 			catch (Exception ex)

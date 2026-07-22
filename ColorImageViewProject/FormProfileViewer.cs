@@ -224,8 +224,10 @@ namespace ColorImageViewProject
 				{
 					var pov = new PointF[] { new PointF(0, yy) };
 					_matWorkPbox.TransformPoints(pov);
-					var pen = new Pen((yy % 50 == 0) ? Color.LightBlue : Color.LightGray, (yy % 100 == 0) ? 2f : 1f);
-					_graWorkPbox.DrawLine(pen, 0f, pov[0].Y, _bmpWorkPbox.Width, pov[0].Y);
+					using (var pen = new Pen((yy % 50 == 0) ? Color.LightBlue : Color.LightGray, (yy % 100 == 0) ? 2f : 1f))
+					{
+						_graWorkPbox.DrawLine(pen, 0f, pov[0].Y, _bmpWorkPbox.Width, pov[0].Y);
+					}
 				}
 
 			}
@@ -234,14 +236,16 @@ namespace ColorImageViewProject
 			if (cboxIsDrawGridlineH.Checked && cboxIsDrawColH.Checked)
 			{
 				// H用横線  360°
-				var pen = new Pen(Color.LightGreen, 2f);
-				var pen2 = new Pen(Color.LightGreen, 1f);
-				pen2.DashStyle = DashStyle.DashDot;
-				_graWorkPbox.DrawLine(pen, 0f, (float)_bmpWorkPbox.Height / 3f * 1f, _bmpWorkPbox.Width, (float)_bmpWorkPbox.Height / 3f * 1f);
-				_graWorkPbox.DrawLine(pen, 0f, (float)_bmpWorkPbox.Height / 3f * 2f, _bmpWorkPbox.Width, (float)_bmpWorkPbox.Height / 3f * 2f);
-				for (int i = 1; i < 36; i++)
+				using (var pen = new Pen(Color.LightGreen, 2f))
+				using (var pen2 = new Pen(Color.LightGreen, 1f))
 				{
-					_graWorkPbox.DrawLine((i % 12 == 0) ? pen : pen2, 0f, (float)_bmpWorkPbox.Height / 36f * i, _bmpWorkPbox.Width, (float)_bmpWorkPbox.Height / 36f * i);
+					pen2.DashStyle = DashStyle.DashDot;
+					_graWorkPbox.DrawLine(pen, 0f, (float)_bmpWorkPbox.Height / 3f * 1f, _bmpWorkPbox.Width, (float)_bmpWorkPbox.Height / 3f * 1f);
+					_graWorkPbox.DrawLine(pen, 0f, (float)_bmpWorkPbox.Height / 3f * 2f, _bmpWorkPbox.Width, (float)_bmpWorkPbox.Height / 3f * 2f);
+					for (int i = 1; i < 36; i++)
+					{
+						_graWorkPbox.DrawLine((i % 12 == 0) ? pen : pen2, 0f, (float)_bmpWorkPbox.Height / 36f * i, _bmpWorkPbox.Width, (float)_bmpWorkPbox.Height / 36f * i);
+					}
 				}
 			}
 
@@ -249,22 +253,26 @@ namespace ColorImageViewProject
 			if (cboxIsDrawGridline.Checked || cboxIsDrawGridlineH.Checked)
 			{
 				// 縦線、データ100毎に(最大100本）
-				var vPen = new Pen(Color.LightGray, 1f);
-				for (int xx = 0; xx < 10000; xx += 100)
+				using (var vPen = new Pen(Color.LightGray, 1f))
 				{
-					var pov = new PointF[] { new PointF(xx, 0) };
-					_matWorkPbox.TransformPoints( pov );
-					_graWorkPbox.DrawLine(vPen, pov[0].X, (float)0, pov[0].X, (float)_bmpWorkPbox.Height);
+					for (int xx = 0; xx < 10000; xx += 100)
+					{
+						var pov = new PointF[] { new PointF(xx, 0) };
+						_matWorkPbox.TransformPoints( pov );
+						_graWorkPbox.DrawLine(vPen, pov[0].X, (float)0, pov[0].X, (float)_bmpWorkPbox.Height);
+					}
 				}
 			}
 
 			// インデックスの表示
 			if (_lastDist != null && _lastDist >= 0)
 			{
-				var iPen = new Pen(Color.Orange, 1f);
-				var pov = new PointF[] { new PointF((float)_lastDist.Value, 0) };
-				_matWorkPbox.TransformPoints(pov);
-				_graWorkPbox.DrawLine(iPen, pov[0].X, (float)0, pov[0].X, (float)_bmpWorkPbox.Height);
+				using (var iPen = new Pen(Color.Orange, 1f))
+				{
+					var pov = new PointF[] { new PointF((float)_lastDist.Value, 0) };
+					_matWorkPbox.TransformPoints(pov);
+					_graWorkPbox.DrawLine(iPen, pov[0].X, (float)0, pov[0].X, (float)_bmpWorkPbox.Height);
+				}
 			}
 
 
@@ -291,9 +299,11 @@ namespace ColorImageViewProject
 		/// <param name="pen">ペン</param>
 		private void DrawGraph(PointF[] poss, Pen pen)
 		{
-			if (_graWorkPbox == null) return;
-
-			_graWorkPbox.DrawLines(pen, poss);
+			using (pen)
+			{
+				if (_graWorkPbox == null || poss == null || poss.Length == 0) return;
+				_graWorkPbox.DrawLines(pen, poss);
+			}
 		}
 
 		/// <summary>
@@ -302,10 +312,13 @@ namespace ColorImageViewProject
 		/// <param name="pen">ペン</param>
 		private void DrawGraphMat(PointF[] poss, Pen pen)
 		{
-			if (_graWorkPbox == null || poss == null || poss.Length == 0) return;
-			var pv = poss.ToArray();
-			_matWorkPbox.TransformPoints(pv);
-			_graWorkPbox.DrawLines(pen, pv);
+			using (pen)
+			{
+				if (_graWorkPbox == null || poss == null || poss.Length == 0) return;
+				var pv = poss.ToArray();
+				_matWorkPbox.TransformPoints(pv);
+				_graWorkPbox.DrawLines(pen, pv);
+			}
 		}
 
 
@@ -315,9 +328,11 @@ namespace ColorImageViewProject
 		/// <param name="pen">ペン</param>
 		private void DrawPosPlot(PointF[] poss, Pen pen)
 		{
-			if (_graWorkPbox == null) return;
-
-			foreach (var po in poss) _graWorkPbox.DrawEllipse(pen, new RectangleF(po.X - 1f, po.Y - 1f, 2f, 2f));
+			using (pen)
+			{
+				if (_graWorkPbox == null || poss == null || poss.Length == 0) return;
+				foreach (var po in poss) _graWorkPbox.DrawEllipse(pen, new RectangleF(po.X - 1f, po.Y - 1f, 2f, 2f));
+			}
 		}
 
 
@@ -505,7 +520,7 @@ namespace ColorImageViewProject
 				//OKボタンがクリックされたとき
 				// 拡張子に強制的にあわせる場合には、ここにコードを入れること（現在はインデックスにより決定される）
 				var it = new ImageFormat[] { ImageFormat.Png, ImageFormat.Jpeg, ImageFormat.Bmp, ImageFormat.Tiff };
-				ImageFormat fmt = (sfd.FilterIndex > 0 && sfd.FilterIndex < it.Length) ? it[sfd.FilterIndex - 1] : ImageFormat.Png;
+				ImageFormat fmt = (sfd.FilterIndex > 0 && sfd.FilterIndex <= it.Length) ? it[sfd.FilterIndex - 1] : ImageFormat.Png;
 				bmp.Save(sfd.FileName, fmt);
 			}
 		}

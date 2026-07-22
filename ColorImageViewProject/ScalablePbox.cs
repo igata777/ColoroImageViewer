@@ -28,6 +28,8 @@ namespace ColorImageViewProject
 	[Serializable]
 	public class ScalablePbox:IDisposable
 	{
+		private bool _disposed = false;
+
         // メインピクチャーボックスのマウスによる拡大、縮小
         /// <summary> マウスダウンフラグです </summary>
         protected bool _mainPictureBoxMouseDownFlg = false;
@@ -182,18 +184,22 @@ namespace ColorImageViewProject
 		}
 
 
-	    /// <summary>メインイメージの描画処理です</summary>
+		/// <summary>メインイメージの描画処理です</summary>
         public void DrawMainImage()
         {
 			if (_isNoImageMode)
 			{
 				if (_pictBox != null)
 				{
-					_pictBox.CreateGraphics().Clear(_pictBox.BackColor);
+					using (var g = _pictBox.CreateGraphics())
+					{
+						g.Clear(_pictBox.BackColor);
+					}
 				}
 				return;
 			}
             if (_mainImage== null || _mainImage.Bmap == null) return;
+			if (_mainImage.Graph == null) return;
 
             // 補間モードの設定
 			try
@@ -845,10 +851,16 @@ namespace ColorImageViewProject
 		{
 			_isNoImageMode = true;
 			_mainImage.SetNoImage();
-			_pictBox.CreateGraphics().Clear(_pictBox.BackColor);
+			using (var g = _pictBox.CreateGraphics())
+			{
+				g.Clear(_pictBox.BackColor);
+			}
 			if (_pictBox.Image != null)
 			{
-				Graphics.FromImage(_pictBox.Image).Clear(_pictBox.BackColor);
+				using (var g = Graphics.FromImage(_pictBox.Image))
+				{
+					g.Clear(_pictBox.BackColor);
+				}
 			}
 			_pictBox.Refresh();
 		}
@@ -995,6 +1007,29 @@ namespace ColorImageViewProject
 		/// <summary>オブジェクトを破棄します</summary>
 		public void Dispose()
 		{
+			if (_disposed) return;
+			_disposed = true;
+
+			if (_pictBox != null)
+			{
+				_pictBox.SizeChanged -= MainPictureBox_SizeChanged;
+				_pictBox.MouseDown -= MainPictureBox_MouseDown;
+				_pictBox.MouseMove -= MainPictureBox_MouseMove;
+				_pictBox.MouseUp -= MainPictureBox_MouseUp;
+				_pictBox.MouseWheel -= MainPictureBox_MouseWheel;
+			}
+
+			_mainImage?.Dispose();
+			_mainImage = null;
+			_parentControl = null;
+			_pictBox = null;
+			_actionOnClick = null;
+			_actionOnMove = null;
+			_onChgMat = null;
+			_actionChangeRect = null;
+			_onDraw = null;
+
+			GC.SuppressFinalize(this);
 		}
 
 		
@@ -1021,6 +1056,8 @@ namespace ColorImageViewProject
 	/// <summary>メインフォームで使用するメインイメージクラスです</summary>
 	public class ScalablePboxMainImage:IDisposable
 	{
+		private bool _disposed = false;
+
         protected Bitmap _bmap = null;
         protected Graphics _graph = null;
         protected Matrix _mat = new Matrix();
@@ -1035,14 +1072,12 @@ namespace ColorImageViewProject
 			get { return _bmap; }
             set
             {
-                if (_bmap != null)
-                {
-                    _bmap.Dispose();
-                }
-                _bmap = (Bitmap)value.Clone();
+				var newBitmap = value != null ? (Bitmap)value.Clone() : null;
+                _bmap?.Dispose();
+                _bmap = newBitmap;
                 if (IsFixed == false || IsPowerFlag == true)	// 画面サイズFixモードでなければ、Matrixを初期化する
                 {
-                    ResetMatrix();
+					if (_bmap != null) ResetMatrix();
                 }
 
             }
@@ -1085,7 +1120,12 @@ namespace ColorImageViewProject
        public Matrix Mat
 		{
 			get{ return _mat; }
-			set{ _mat = value; }
+			set
+			{
+				if (ReferenceEquals(_mat, value)) return;
+				_mat?.Dispose();
+				_mat = value ?? new Matrix();
+			}
 		}
  		/// <summary>固定倍率フラグを設定または取得します</summary>
 		public bool IsFixed{ get; set; }
@@ -1326,24 +1366,33 @@ namespace ColorImageViewProject
 		/// <summary>メインピクチャーボックスサイズの変更時処理です</summary>
 		public void PboxSizeChanged(PictureBox pbox)
 		{
+			if (pbox == null || pbox.Width <= 0 || pbox.Height <= 0) return;
+
+			Bitmap newbmp;
 			try
 			{
 				// PictureBoxと同じ大きさのBitmapクラスを作成する。 
-				var newbmp = new Bitmap( pbox.Width, pbox.Height, PixelFormat.Format24bppRgb );
-				// 空のBitmapをPictureBoxのImageに指定する。 
-				pbox.Image = newbmp;
+				newbmp = new Bitmap( pbox.Width, pbox.Height, PixelFormat.Format24bppRgb );
 			}
 			catch//( Exception ex )
 			{
 //				DevelopLog.LogException( MethodBase.GetCurrentMethod(), "サイズ変更時に新ビットマップ作成に失敗", ex );
 				return;
 			}
+
+			var oldImage = pbox.Image;
 			if (_graph != null)
 			{
-				_mat = _graph.Transform;
+				var currentMat = _graph.Transform;
 				_graph.Dispose();
 				_graph = null;
+				_mat?.Dispose();
+				_mat = currentMat;
 			}
+
+			// 空のBitmapをPictureBoxのImageに指定する。 
+			pbox.Image = newbmp;
+			oldImage?.Dispose();
 
 			// Graphicsオブジェクトの作成(FromImageを使う) 
 			_graph = Graphics.FromImage(pbox.Image);
@@ -1360,6 +1409,27 @@ namespace ColorImageViewProject
 		/// </summary>
 		public void Dispose()
 		{
+			if (_disposed) return;
+			_disposed = true;
+
+			_graph?.Dispose();
+			_graph = null;
+
+			_bmap?.Dispose();
+			_bmap = null;
+
+			_mat?.Dispose();
+			_mat = null;
+
+			if (_pbox != null)
+			{
+				var image = _pbox.Image;
+				_pbox.Image = null;
+				image?.Dispose();
+				_pbox = null;
+			}
+
+			GC.SuppressFinalize(this);
 		}
 
 	}

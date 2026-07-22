@@ -242,8 +242,9 @@ namespace ColorImageViewProject
 			{
 				// 読み込んだファイルを削除できるように、ストリームを解放する方式とした。CreateBitmap()を直接呼ぶとClone()で例外が発生するため、展開した
 				using (var fs = new System.IO.FileStream(filepath, FileMode.Open, FileAccess.Read))
+				using (var tmpbmp = Bitmap.FromStream(fs) as Bitmap)
 				{
-					var tmpbmp = Bitmap.FromStream(fs) as Bitmap;
+					if (tmpbmp == null) return null;
 					if (tmpbmp.PixelFormat == pf)
 					{
 						// 単純にClone()だとPixelFormatがARGB(32bit)に変換されてしまう。また、Clone()を用いると、シャローコピーされて本来の目的を達成できない。
@@ -258,8 +259,6 @@ namespace ColorImageViewProject
 						// pixelformatが異なる場合にはCloneでもシャローではない模様。
 						ret = tmpbmp.Clone(new Rectangle(new Point(0, 0), tmpbmp.Size), pf);
 					}
-					tmpbmp.Dispose();
-					fs.Close();
 				}
 			}
 			catch
@@ -268,6 +267,49 @@ namespace ColorImageViewProject
 				ret = null;
 			}
 			return ret;
+		}
+
+
+		/// <summary>
+		/// 指定したファイルが画像ファイルとして扱える拡張子を持つか判定します</summary>
+		/// <param name="filepath">ファイルパス</param>
+		/// <returns>画像ファイルとして扱える場合、true</returns>
+		static public bool IsSupportedImageFile(string filepath)
+		{
+			if (String.IsNullOrWhiteSpace(filepath) || File.Exists(filepath) == false) return false;
+
+			switch (Path.GetExtension(filepath).ToUpperInvariant())
+			{
+				case ".JPG":
+				case ".JPEG":
+				case ".PNG":
+				case ".BMP":
+				case ".GIF":
+				case ".TIF":
+				case ".TIFF":
+				case ".WEBP":
+					return true;
+				default:
+					return false;
+			}
+		}
+
+
+		/// <summary>
+		/// 指定した画像ファイル群から、読み込みに成功したビットマップを生成します</summary>
+		/// <param name="filepaths">画像ファイルパス群</param>
+		/// <param name="pf">ピクセルフォーマット</param>
+		/// <returns>ビットマップと表示名の組。呼び出し側でBitmapを破棄してください</returns>
+		static public (Bitmap Bmp, string FileName)[] LoadBitmapFilesPF(IEnumerable<string> filepaths, PixelFormat pf)
+		{
+			if (filepaths == null) return Array.Empty<(Bitmap Bmp, string FileName)>();
+
+			return filepaths
+				.Where(IsSupportedImageFile)
+				.Select(fp => new { Bmp = LoadBitmapPF(fp, pf), FileName = Path.GetFileName(fp) })
+				.Where(w => w.Bmp != null)
+				.Select(w => (w.Bmp, w.FileName))
+				.ToArray();
 		}
 
 
@@ -284,10 +326,9 @@ namespace ColorImageViewProject
 				filepath,
 				System.IO.FileMode.Open,
 				System.IO.FileAccess.Read))
+			using (var tmpbmp = Bitmap.FromStream(fs) as Bitmap)
 			{
-				var img = Bitmap.FromStream(fs) as Bitmap;
-				fs.Close();
-				return img;
+				return tmpbmp == null ? null : tmpbmp.Clone(new Rectangle(new Point(0, 0), tmpbmp.Size), tmpbmp.PixelFormat);
 			}
 		}
 

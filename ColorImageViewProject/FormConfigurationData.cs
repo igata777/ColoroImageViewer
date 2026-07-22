@@ -5,8 +5,6 @@ using System.Data;
 using System.Drawing;
 using System.Linq;
 using System.Text;
-using System.IO;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Windows.Forms;
 using System.Text.Json;
 
@@ -43,7 +41,7 @@ namespace ColorImageViewProject
 		{
 			InitializeComponent();
 
-			_workset = workset;
+			_workset = CloneObject(workset);
 			_orgData = CloneObject(workset); // ディープコピー
 			if (icon != null) this.Icon = icon;
 		}
@@ -106,8 +104,11 @@ namespace ColorImageViewProject
 		/// <summary>
 		/// オブジェクトのディープコピーを返します。</summary>
 		/// <returns>オブジェクト</returns>
-		public T CloneObject<T>(T serialObj)
+		public object CloneObject(object serialObj)
 		{
+			if (serialObj == null) return null;
+			if (serialObj is ICloneable cloneable) return cloneable.Clone();
+
 			// JSON のシリアライズおよびデシリアライズの振る舞いを制御するためのオプションを設定する
 			var options = new JsonSerializerOptions
 			{
@@ -115,8 +116,9 @@ namespace ColorImageViewProject
 				ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.Preserve
 			};
 			// シリアライズ→デシリアライズしてクローン作成。
-			var jsonString = JsonSerializer.Serialize(serialObj, options);
-			return JsonSerializer.Deserialize<T>(jsonString, options);
+			var serialObjType = serialObj.GetType();
+			var jsonString = JsonSerializer.Serialize(serialObj, serialObjType, options);
+			return JsonSerializer.Deserialize(jsonString, serialObjType, options);
 		}
 
 
