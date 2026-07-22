@@ -274,10 +274,12 @@ namespace ColorImageViewProject
                 if (e.Data.GetDataPresent(DataFormats.FileDrop))
                 {
                     var args = (string[])e.Data.GetData(DataFormats.FileDrop);
-                    var images = UtilityGraphics.LoadBitmapFilesPF(args, PixelFormat.Format24bppRgb);
+                    var images = UtilityGraphics.LoadBitmapFilesPF(args, PixelFormat.Format24bppRgb, out var failures);
                     if (images.Length == 0)
                     {
-                        MessageBox.Show("有効な画像ファイルが見つかりませんでした。", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        var message = UtilityGraphics.CreateLoadBitmapFilesMessage(images.Length, failures);
+                        if (String.IsNullOrWhiteSpace(message)) message = "有効な画像ファイルが見つかりませんでした。";
+                        MessageBox.Show(message, "画像読み込みエラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         return;
                     }
 
@@ -289,6 +291,11 @@ namespace ColorImageViewProject
                             frm.Show();
                         }
                     }
+
+					if (failures.Length > 0)
+					{
+						MessageBox.Show(UtilityGraphics.CreateLoadBitmapFilesMessage(images.Length, failures), "画像読み込み結果", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+					}
                 }
             }
             catch
@@ -624,9 +631,11 @@ namespace ColorImageViewProject
 			//はじめに表示されるフォルダを指定する
 			sfd.InitialDirectory = System.Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
 			//[ファイルの種類]に表示される選択肢を指定する
-			sfd.Filter = "PNGファイル(*.png)|*.png|JPGファイル(*.jpg)|*.jpg|ビットマップファイル(*.bmp)|*.bmp|TIFFファイル(*.tif)|*.tif|すべてのファイル(*.*)|*.*";
+			sfd.Filter = UtilityGraphics.ImageSaveFileDialogFilter;
 			//[ファイルの種類]ではじめに「PNGファイル」が選択されているようにする
 			sfd.FilterIndex = 1;
+			sfd.DefaultExt = "png";
+			sfd.AddExtension = true;
 			//タイトルを設定する
 			sfd.Title = "保存ファイルを選択してください";
 			//ダイアログボックスを閉じる前に現在のディレクトリを復元するようにする
@@ -635,10 +644,11 @@ namespace ColorImageViewProject
 			if (sfd.ShowDialog() == DialogResult.OK)
 			{
 				//OKボタンがクリックされたとき
-				// 拡張子に強制的にあわせる場合には、ここにコードを入れること（現在はインデックスにより決定される）
-				var it = new ImageFormat[] { ImageFormat.Png, ImageFormat.Jpeg, ImageFormat.Bmp, ImageFormat.Tiff };
-				ImageFormat fmt = (sfd.FilterIndex > 0 && sfd.FilterIndex <= it.Length) ? it[sfd.FilterIndex - 1] : ImageFormat.Png;
-				bmp.Save(sfd.FileName, fmt);
+				if (UtilityGraphics.TryResolveImageSaveFormat(sfd.FileName, sfd.FilterIndex, out var saveFileName, out var fmt) == false ||
+					UtilityGraphics.SaveBitmap(bmp, saveFileName, fmt) == false)
+				{
+					MessageBox.Show(String.Format("ファイル（{0}）書き込みが失敗しました", Path.GetFileName(sfd.FileName)), "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				}
 			}
 		}
 
@@ -2200,20 +2210,25 @@ namespace ColorImageViewProject
 		{
 			try
 			{
-				var dic = new Dictionary<string, ImageFormat>() { { ".PNG", ImageFormat.Png }, { ".BMP", ImageFormat.Bmp }, { ".JPG", ImageFormat.Jpeg }, { ".JPEG", ImageFormat.Jpeg } };
 				var sfd = new SaveFileDialog();
 
 				sfd.FileName = defname;
 				sfd.InitialDirectory = System.Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-				sfd.Filter = "PNGファイル(*.png)|*.png|BMPファイル(*.bmp)|*.bmp|JPGファイル(*.jpg)|*.jpg|すべてのファイル(*.*)|*.*";
+				sfd.Filter = UtilityGraphics.ImageSaveFileDialogFilter;
 				sfd.FilterIndex = 1;
+				sfd.DefaultExt = "png";
+				sfd.AddExtension = true;
 				sfd.Title = "保存ファイルを選択してください";
 				sfd.RestoreDirectory = true;
 				if (sfd.ShowDialog() == DialogResult.OK)
 				{
-					var imgfmt = ImageFormat.Jpeg;
-					if (dic.TryGetValue(Path.GetExtension(sfd.FileName).ToUpper(), out ImageFormat imf)) imgfmt = imf;
-					bmp.Save(sfd.FileName, imgfmt);
+					if (UtilityGraphics.TryResolveImageSaveFormat(sfd.FileName, sfd.FilterIndex, out var saveFileName, out var imgfmt) == false ||
+						UtilityGraphics.SaveBitmap(bmp, saveFileName, imgfmt) == false)
+					{
+						MessageBox.Show(String.Format("ファイル（{0}）書き込みが失敗しました", Path.GetFileName(sfd.FileName)), "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+						return false;
+					}
+					return true;
 				}
 			}
 			catch (Exception ex)

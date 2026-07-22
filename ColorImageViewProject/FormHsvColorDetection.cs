@@ -9,6 +9,7 @@ using System.Windows.Forms;
 using System.IO;
 using System.Drawing.Imaging;
 using System.Drawing.Drawing2D;
+using ColorImageViewProject;
 
 
 namespace IAPLibrary
@@ -566,9 +567,11 @@ namespace IAPLibrary
 			//はじめのファイル名を指定する
 			sfd.FileName = "OriginalImage";
 			//[ファイルの種類]に表示される選択肢を指定する
-			sfd.Filter = "PNGファイル(*.png)|*.png|JPGファイル(*.jpg)|*.jpg|ビットマップファイル(*.bmp)|*.bmp|TIFFファイル(*.tif)|*.tif|すべてのファイル(*.*)|*.*";
+			sfd.Filter = UtilityGraphics.ImageSaveFileDialogFilter;
 			//[ファイルの種類]ではじめに「PNGファイル」が選択されているようにする
 			sfd.FilterIndex = 1;
+			sfd.DefaultExt = "png";
+			sfd.AddExtension = true;
 			//タイトルを設定する
 			sfd.Title = "保存ファイルを選択してください";
 			//ダイアログボックスを閉じる前に現在のディレクトリを復元するようにする
@@ -577,10 +580,11 @@ namespace IAPLibrary
 			if (sfd.ShowDialog() == DialogResult.OK)
 			{
 				//OKボタンがクリックされたとき
-				// 拡張子に強制的にあわせる場合には、ここにコードを入れること（現在はインデックスにより決定される）
-				var it = new ImageFormat[] { ImageFormat.Png, ImageFormat.Jpeg, ImageFormat.Bmp, ImageFormat.Tiff };
-				ImageFormat fmt = (sfd.FilterIndex > 0 && sfd.FilterIndex <= it.Length) ? it[sfd.FilterIndex - 1] : ImageFormat.Png;
-				_originalImage.Save(sfd.FileName, fmt);
+				if (UtilityGraphics.TryResolveImageSaveFormat(sfd.FileName, sfd.FilterIndex, out var saveFileName, out var fmt) == false ||
+					UtilityGraphics.SaveBitmap(_originalImage, saveFileName, fmt) == false)
+				{
+					MessageBox.Show(String.Format("ファイル（{0}）書き込みが失敗しました", Path.GetFileName(sfd.FileName)), "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				}
 			}
 		}
 
@@ -680,9 +684,11 @@ namespace IAPLibrary
 			//はじめのファイル名を指定する
 			sfd.FileName = "ResultImage";
 			//[ファイルの種類]に表示される選択肢を指定する
-			sfd.Filter = "PNGファイル(*.png)|*.png|JPGファイル(*.jpg)|*.jpg|ビットマップファイル(*.bmp)|*.bmp|TIFFファイル(*.tif)|*.tif|すべてのファイル(*.*)|*.*";
+			sfd.Filter = UtilityGraphics.ImageSaveFileDialogFilter;
 			//[ファイルの種類]ではじめに「PNGファイル」が選択されているようにする
 			sfd.FilterIndex = 1;
+			sfd.DefaultExt = "png";
+			sfd.AddExtension = true;
 			//タイトルを設定する
 			sfd.Title = "保存ファイルを選択してください";
 			//ダイアログボックスを閉じる前に現在のディレクトリを復元するようにする
@@ -691,10 +697,11 @@ namespace IAPLibrary
 			if (sfd.ShowDialog() == DialogResult.OK)
 			{
 				//OKボタンがクリックされたとき
-				// 拡張子に強制的にあわせる場合には、ここにコードを入れること（現在はインデックスにより決定される）
-				var it = new ImageFormat[] { ImageFormat.Png, ImageFormat.Jpeg, ImageFormat.Bmp, ImageFormat.Tiff };
-				ImageFormat fmt = (sfd.FilterIndex > 0 && sfd.FilterIndex <= it.Length) ? it[sfd.FilterIndex - 1] : ImageFormat.Png;
-				_resultImage.Save(sfd.FileName, fmt);
+				if (UtilityGraphics.TryResolveImageSaveFormat(sfd.FileName, sfd.FilterIndex, out var saveFileName, out var fmt) == false ||
+					UtilityGraphics.SaveBitmap(_resultImage, saveFileName, fmt) == false)
+				{
+					MessageBox.Show(String.Format("ファイル（{0}）書き込みが失敗しました", Path.GetFileName(sfd.FileName)), "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				}
 			}
 
 		}

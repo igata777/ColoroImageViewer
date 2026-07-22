@@ -295,6 +295,101 @@ namespace ColorImageViewProject
 		}
 
 
+		/// <summary>画像保存ダイアログ用のフィルター文字列</summary>
+		public const string ImageSaveFileDialogFilter = "PNGファイル(*.png)|*.png|JPGファイル(*.jpg)|*.jpg|ビットマップファイル(*.bmp)|*.bmp|TIFFファイル(*.tif)|*.tif|すべてのファイル(*.*)|*.*";
+
+
+		/// <summary>
+		/// 拡張子から画像保存形式を取得します</summary>
+		/// <param name="filepath">ファイルパス</param>
+		/// <param name="imgFormat">画像形式</param>
+		/// <returns>対応する拡張子の場合、true</returns>
+		static public bool TryGetImageFormatFromExtension(string filepath, out ImageFormat imgFormat)
+		{
+			switch (Path.GetExtension(filepath).ToUpperInvariant())
+			{
+				case ".JPG":
+				case ".JPEG":
+					imgFormat = ImageFormat.Jpeg;
+					return true;
+				case ".BMP":
+					imgFormat = ImageFormat.Bmp;
+					return true;
+				case ".PNG":
+					imgFormat = ImageFormat.Png;
+					return true;
+				case ".TIF":
+				case ".TIFF":
+					imgFormat = ImageFormat.Tiff;
+					return true;
+				case ".GIF":
+					imgFormat = ImageFormat.Gif;
+					return true;
+				default:
+					imgFormat = null;
+					return false;
+			}
+		}
+
+
+		/// <summary>
+		/// 保存ダイアログの選択インデックスから画像形式を取得します</summary>
+		/// <param name="filterIndex">SaveFileDialog.FilterIndex</param>
+		/// <returns>対応する画像形式。すべてのファイルなど画像形式が決まらない場合はnull</returns>
+		static public ImageFormat GetImageFormatFromSaveFilterIndex(int filterIndex)
+		{
+			switch (filterIndex)
+			{
+				case 1:
+					return ImageFormat.Png;
+				case 2:
+					return ImageFormat.Jpeg;
+				case 3:
+					return ImageFormat.Bmp;
+				case 4:
+					return ImageFormat.Tiff;
+				default:
+					return null;
+			}
+		}
+
+
+		/// <summary>
+		/// 画像形式の標準拡張子を取得します</summary>
+		/// <param name="imgFormat">画像形式</param>
+		/// <returns>標準拡張子</returns>
+		static public string GetDefaultImageExtension(ImageFormat imgFormat)
+		{
+			if (imgFormat == null) return ".png";
+			if (imgFormat.Guid == ImageFormat.Jpeg.Guid) return ".jpg";
+			if (imgFormat.Guid == ImageFormat.Bmp.Guid) return ".bmp";
+			if (imgFormat.Guid == ImageFormat.Tiff.Guid) return ".tif";
+			if (imgFormat.Guid == ImageFormat.Gif.Guid) return ".gif";
+			return ".png";
+		}
+
+
+		/// <summary>
+		/// 保存先パスと保存ダイアログ選択から、実際に使用する保存パスと画像形式を決定します</summary>
+		/// <param name="filepath">保存先パス</param>
+		/// <param name="filterIndex">SaveFileDialog.FilterIndex</param>
+		/// <param name="saveFilepath">実際の保存先パス</param>
+		/// <param name="imgFormat">実際の画像形式</param>
+		/// <returns>保存形式を決定できた場合、true</returns>
+		static public bool TryResolveImageSaveFormat(string filepath, int filterIndex, out string saveFilepath, out ImageFormat imgFormat)
+		{
+			saveFilepath = filepath;
+			imgFormat = ImageFormat.Png;
+			if (String.IsNullOrWhiteSpace(filepath)) return false;
+
+			if (TryGetImageFormatFromExtension(filepath, out imgFormat)) return true;
+
+			imgFormat = GetImageFormatFromSaveFilterIndex(filterIndex) ?? ImageFormat.Png;
+			saveFilepath = Path.ChangeExtension(filepath, GetDefaultImageExtension(imgFormat));
+			return true;
+		}
+
+
 		/// <summary>
 		/// 指定した画像ファイル群から、読み込みに成功したビットマップを生成します</summary>
 		/// <param name="filepaths">画像ファイルパス群</param>
@@ -302,14 +397,80 @@ namespace ColorImageViewProject
 		/// <returns>ビットマップと表示名の組。呼び出し側でBitmapを破棄してください</returns>
 		static public (Bitmap Bmp, string FileName)[] LoadBitmapFilesPF(IEnumerable<string> filepaths, PixelFormat pf)
 		{
-			if (filepaths == null) return Array.Empty<(Bitmap Bmp, string FileName)>();
+			return LoadBitmapFilesPF(filepaths, pf, out _);
+		}
 
-			return filepaths
-				.Where(IsSupportedImageFile)
-				.Select(fp => new { Bmp = LoadBitmapPF(fp, pf), FileName = Path.GetFileName(fp) })
-				.Where(w => w.Bmp != null)
-				.Select(w => (w.Bmp, w.FileName))
-				.ToArray();
+
+		/// <summary>
+		/// 指定した画像ファイル群から、読み込みに成功したビットマップと失敗情報を生成します</summary>
+		/// <param name="filepaths">画像ファイルパス群</param>
+		/// <param name="pf">ピクセルフォーマット</param>
+		/// <param name="failures">読み込めなかったファイル名と理由</param>
+		/// <returns>ビットマップと表示名の組。呼び出し側でBitmapを破棄してください</returns>
+		static public (Bitmap Bmp, string FileName)[] LoadBitmapFilesPF(IEnumerable<string> filepaths, PixelFormat pf, out (string FileName, string Reason)[] failures)
+		{
+			var images = new List<(Bitmap Bmp, string FileName)>();
+			var failureList = new List<(string FileName, string Reason)>();
+
+			if (filepaths == null)
+			{
+				failures = Array.Empty<(string FileName, string Reason)>();
+				return Array.Empty<(Bitmap Bmp, string FileName)>();
+			}
+
+			foreach (var filepath in filepaths)
+			{
+				var fileName = Path.GetFileName(filepath);
+				if (String.IsNullOrWhiteSpace(fileName)) fileName = filepath;
+
+				if (File.Exists(filepath) == false)
+				{
+					failureList.Add((fileName, "ファイルが見つかりません"));
+					continue;
+				}
+
+				if (IsSupportedImageFile(filepath) == false)
+				{
+					failureList.Add((fileName, "非対応の拡張子です"));
+					continue;
+				}
+
+				var bmp = LoadBitmapPF(filepath, pf);
+				if (bmp == null)
+				{
+					failureList.Add((fileName, "画像として読み込めません"));
+					continue;
+				}
+
+				images.Add((bmp, fileName));
+			}
+
+			failures = failureList.ToArray();
+			return images.ToArray();
+		}
+
+
+		/// <summary>
+		/// 複数画像読み込み結果のメッセージを作成します</summary>
+		/// <param name="successCount">読み込み成功数</param>
+		/// <param name="failures">読み込めなかったファイル名と理由</param>
+		/// <returns>表示用メッセージ</returns>
+		static public string CreateLoadBitmapFilesMessage(int successCount, (string FileName, string Reason)[] failures)
+		{
+			var sb = new StringBuilder();
+			if (successCount > 0) sb.AppendLine($"{successCount}件の画像を開きました。");
+			if (failures == null || failures.Length == 0) return sb.ToString().TrimEnd();
+
+			sb.AppendLine($"{failures.Length}件のファイルは開けませんでした。");
+			foreach (var failure in failures.Take(10))
+			{
+				sb.AppendLine($"- {failure.FileName}: {failure.Reason}");
+			}
+			if (failures.Length > 10)
+			{
+				sb.AppendLine($"... 他 {failures.Length - 10}件");
+			}
+			return sb.ToString().TrimEnd();
 		}
 
 
@@ -338,7 +499,7 @@ namespace ColorImageViewProject
 		/// </summary>
 		/// <param name="bmp">保存するビットマップ</param>
 		/// <param name="filepath">ファイルパス</param>
-		/// <param name="imgFormat">ファイルフォーマット（指定が無い場合には拡張子で判断、不明な場合にはjpgとする</param>
+		/// <param name="imgFormat">ファイルフォーマット（指定が無い場合には拡張子で判断、不明な場合にはPNGとする</param>
 		/// <returns>成否</returns>
 		/// <remarks>Bitmap.Save()ではストリームが解放されているか不明（テストした限りロックされない）。本メソッドでは明示的にClose()およびusingによるdispose処理を行う</remarks>
 		public static bool SaveBitmap(Bitmap bmp, string filepath, ImageFormat imgFormat = null)
@@ -348,29 +509,7 @@ namespace ColorImageViewProject
 				// フォーマットが未指定の場合、拡張子で判断する
 				if (imgFormat == null)
 				{
-					switch( Path.GetExtension(filepath).ToUpper())
-					{
-						case ".JPG":
-						case ".JPEG":
-							imgFormat = ImageFormat.Jpeg; 
-							break;
-						case ".BMP":
-							imgFormat = ImageFormat.Bmp;
-							break;
-						case ".PNG":
-							imgFormat = ImageFormat.Png;
-							break;
-						case ".TIF":
-						case ".TIFF":
-							imgFormat = ImageFormat.Tiff;
-							break;
-						case ".GIF":
-							imgFormat = ImageFormat.Gif;
-							break;
-						default:
-							imgFormat = ImageFormat.Jpeg;
-							break;
-					}
+					if (TryGetImageFormatFromExtension(filepath, out imgFormat) == false) imgFormat = ImageFormat.Png;
 				}
 
 				//　ファイルストリームで書き込み、確実にdisposeする(using)

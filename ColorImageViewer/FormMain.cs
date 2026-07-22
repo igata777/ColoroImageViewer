@@ -43,11 +43,8 @@ namespace ColorImageViewer
 				}
 
 				// 引数がある場合には、それらがすべて閉じられるまで透明フォームとして存在する。画像表示フォームから抜ける場合には OnClosedImageForm が呼ばれるようにしておく。
-				_count = OpenImageForms(args, OnClosedImageForm);
-				if (_count == 0)
-				{
-					MessageBox.Show("有効な画像ファイルが見つかりませんでした。");
-				}
+				_count = OpenImageForms(args, OnClosedImageForm, out var failures);
+				ShowImageLoadResult(_count, failures);
 			}
 			catch (Exception ex)
 			{
@@ -96,17 +93,18 @@ namespace ColorImageViewer
 		/// <param name="isInit">初期化時フラグ</param>
         public void OpenFiles(string[] filePaths, bool isInit)
         {
-            var openCount = OpenImageForms(filePaths, OnClosedImageForm);
+            var openCount = OpenImageForms(filePaths, OnClosedImageForm, out var failures);
 
             if (openCount == 0)
             {
-                MessageBox.Show("有効な画像ファイルが見つかりませんでした。");
+                ShowImageLoadResult(openCount, failures);
                 return;
             }
 
             if( _count> 0 || isInit ) _count += openCount;
 
 			SetFormVisible();
+            ShowImageLoadResult(openCount, failures);
         }
 
 
@@ -115,9 +113,9 @@ namespace ColorImageViewer
 		/// <param name="filePaths">ファイルパス群</param>
 		/// <param name="onClosed">表示フォームクローズ時に呼び出すアクション</param>
 		/// <returns>開いたフォーム数</returns>
-        private int OpenImageForms(IEnumerable<string> filePaths, Action onClosed)
+        private int OpenImageForms(IEnumerable<string> filePaths, Action onClosed, out (string FileName, string Reason)[] failures)
         {
-            var images = UtilityGraphics.LoadBitmapFilesPF(filePaths, PixelFormat.Format24bppRgb);
+            var images = UtilityGraphics.LoadBitmapFilesPF(filePaths, PixelFormat.Format24bppRgb, out failures);
             var openCount = 0;
             foreach (var image in images)
             {
@@ -129,6 +127,25 @@ namespace ColorImageViewer
                 }
             }
             return openCount;
+        }
+
+
+        /// <summary>
+        /// 複数画像読み込み結果を表示します</summary>
+        /// <param name="openCount">開いた画像数</param>
+        /// <param name="failures">読み込めなかったファイル名と理由</param>
+        private static void ShowImageLoadResult(int openCount, (string FileName, string Reason)[] failures)
+        {
+            if (failures == null || failures.Length == 0)
+            {
+                if (openCount == 0) MessageBox.Show("有効な画像ファイルが見つかりませんでした。", "画像読み込みエラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            var message = UtilityGraphics.CreateLoadBitmapFilesMessage(openCount, failures);
+            var icon = openCount == 0 ? MessageBoxIcon.Error : MessageBoxIcon.Warning;
+            var title = openCount == 0 ? "画像読み込みエラー" : "画像読み込み結果";
+            MessageBox.Show(message, title, MessageBoxButtons.OK, icon);
         }
 
 
@@ -154,14 +171,15 @@ namespace ColorImageViewer
 			if (e.Data.GetDataPresent(DataFormats.FileDrop))
 			{
 				var args = (string[])e.Data.GetData(DataFormats.FileDrop);
-				var openCount = OpenImageForms(args, OnClosedImageForm);
+				var openCount = OpenImageForms(args, OnClosedImageForm, out var failures);
 				if (openCount == 0)
 				{
-					MessageBox.Show("有効な画像ファイルが見つかりませんでした。");
+					ShowImageLoadResult(openCount, failures);
 					return;
 				}
 				if( _count > 0 ) _count += openCount;
 				SetFormVisible();
+				ShowImageLoadResult(openCount, failures);
 			}
 		}
 
