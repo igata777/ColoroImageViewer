@@ -402,6 +402,44 @@ namespace ColorImageViewProject
 
 
 		/// <summary>
+		/// 指定した画像ファイルからビットマップを生成します</summary>
+		/// <param name="filepath">画像ファイルパス</param>
+		/// <param name="pf">ピクセルフォーマット</param>
+		/// <param name="bmp">生成したビットマップ</param>
+		/// <param name="fileName">表示用ファイル名</param>
+		/// <param name="failureReason">読み込めなかった理由</param>
+		/// <returns>読み込みに成功した場合、true</returns>
+		static public bool TryLoadBitmapFilePF(string filepath, PixelFormat pf, out Bitmap bmp, out string fileName, out string failureReason)
+		{
+			bmp = null;
+			fileName = Path.GetFileName(filepath);
+			if (String.IsNullOrWhiteSpace(fileName)) fileName = filepath;
+			failureReason = "";
+
+			if (File.Exists(filepath) == false)
+			{
+				failureReason = "ファイルが見つかりません";
+				return false;
+			}
+
+			if (IsSupportedImageFile(filepath) == false)
+			{
+				failureReason = "非対応の拡張子です";
+				return false;
+			}
+
+			bmp = LoadBitmapPF(filepath, pf);
+			if (bmp == null)
+			{
+				failureReason = "画像として読み込めません";
+				return false;
+			}
+
+			return true;
+		}
+
+
+		/// <summary>
 		/// 指定した画像ファイル群から、読み込みに成功したビットマップと失敗情報を生成します</summary>
 		/// <param name="filepaths">画像ファイルパス群</param>
 		/// <param name="pf">ピクセルフォーマット</param>
@@ -420,25 +458,9 @@ namespace ColorImageViewProject
 
 			foreach (var filepath in filepaths)
 			{
-				var fileName = Path.GetFileName(filepath);
-				if (String.IsNullOrWhiteSpace(fileName)) fileName = filepath;
-
-				if (File.Exists(filepath) == false)
+				if (TryLoadBitmapFilePF(filepath, pf, out var bmp, out var fileName, out var failureReason) == false)
 				{
-					failureList.Add((fileName, "ファイルが見つかりません"));
-					continue;
-				}
-
-				if (IsSupportedImageFile(filepath) == false)
-				{
-					failureList.Add((fileName, "非対応の拡張子です"));
-					continue;
-				}
-
-				var bmp = LoadBitmapPF(filepath, pf);
-				if (bmp == null)
-				{
-					failureList.Add((fileName, "画像として読み込めません"));
+					failureList.Add((fileName, failureReason));
 					continue;
 				}
 
@@ -454,11 +476,13 @@ namespace ColorImageViewProject
 		/// 複数画像読み込み結果のメッセージを作成します</summary>
 		/// <param name="successCount">読み込み成功数</param>
 		/// <param name="failures">読み込めなかったファイル名と理由</param>
+		/// <param name="isCanceled">キャンセルされたかどうか</param>
 		/// <returns>表示用メッセージ</returns>
-		static public string CreateLoadBitmapFilesMessage(int successCount, (string FileName, string Reason)[] failures)
+		static public string CreateLoadBitmapFilesMessage(int successCount, (string FileName, string Reason)[] failures, bool isCanceled = false)
 		{
 			var sb = new StringBuilder();
 			if (successCount > 0) sb.AppendLine($"{successCount}件の画像を開きました。");
+			if (isCanceled) sb.AppendLine("読み込みはキャンセルされました。");
 			if (failures == null || failures.Length == 0) return sb.ToString().TrimEnd();
 
 			sb.AppendLine($"{failures.Length}件のファイルは開けませんでした。");

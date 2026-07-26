@@ -81,6 +81,9 @@ namespace ColorImageViewProject
 		/// <summary>trueの場合には、通知を行いません</summary>
 		protected bool _ignoreNoticeDispRect= false;
 
+		/// <summary>GDI+の巨大画像描画を避ける表示サイズしきい値です</summary>
+		private const int GdiDrawLimitPixels = 32767;
+
 		/// <summary>表示無し状態（モード）を保持します</summary>
 		protected bool _isNoImageMode = false;
 
@@ -199,26 +202,239 @@ namespace ColorImageViewProject
 				return;
 			}
             if (_mainImage== null || _mainImage.Bmap == null) return;
-			if (_mainImage.Graph == null) return;
 
-            // 補間モードの設定
+			// 補間モードの設定
 			try
 			{
-				// アフィン変換行列の設定 
-				if (_mainImage.Mat != null)
+				if (ShouldUseManualNearestDraw(_mainImage.Bmap, _mainImage.Mat))
 				{
-					_mainImage.Graph.Transform = _mainImage.Mat;
+					var backBuffer = new Bitmap(_pictBox.Width, _pictBox.Height, PixelFormat.Format32bppArgb);
+					using (var clearGraph = Graphics.FromImage(backBuffer))
+					{
+						clearGraph.Clear(_pictBox.BackColor);
+					}
+
+					if (DrawVisibleImageNearest(_mainImage.Bmap, backBuffer, _mainImage.Mat) == false)
+					{
+						backBuffer.Dispose();
+						return;
+					}
+
+					if (_onDraw != null)
+					{
+						using (var overlayGraph = Graphics.FromImage(backBuffer))
+						{
+							if (_mainImage.Mat != null) overlayGraph.Transform = _mainImage.Mat;
+							_onDraw(overlayGraph, _mainImage.Bmap.Size);
+						}
+					}
+					ReplacePictureBoxImage(backBuffer);
+					_pictBox.Refresh();
+					return;
 				}
-				_mainImage.Graph.InterpolationMode = (_mainImage.DispRate >= 1.0f) ? InterpolationMode : InterpolationModeReduce;
-				_mainImage.Graph.Clear(_pictBox.BackColor);             // ピクチャボックスのクリア 
-				_mainImage.Graph.DrawImage(_mainImage.Bmap, 0, 0, _mainImage.Bmap.Width, _mainImage.Bmap.Height);      // 描画 
-				if( _onDraw != null ) _onDraw( _mainImage.Graph, _mainImage.Bmap.Size ) ;
-				_pictBox.Refresh();                                     // 再描画 
+
+				if (_mainImage.Graph == null) _mainImage.Graph = Graphics.FromImage(_pictBox.Image);
+				var graph = _mainImage.Graph;
+				graph.ResetTransform();
+				graph.InterpolationMode = (_mainImage.DispRate >= 1.0f) ? InterpolationMode : InterpolationModeReduce;
+				graph.Clear(_pictBox.BackColor);             // ピクチャボックスのクリア
+
+				if (TryCreateVisibleDrawRect(_mainImage.Bmap, _mainImage.Mat, _pictBox.ClientSize, out var sourceRect, out var destRect))
+				{
+					graph.DrawImage(_mainImage.Bmap, destRect, sourceRect, GraphicsUnit.Pixel);
+				}
+
+				if (_onDraw != null)
+				{
+					if (_mainImage.Mat != null) graph.Transform = _mainImage.Mat;
+					_onDraw(graph, _mainImage.Bmap.Size);
+				}
+				_pictBox.Refresh();                                     // 再描画
 			}
 			catch
 			{
 			}
         }
+
+
+		/// <summary>
+		/// 巨大画像向けの手動描画を使用するかどうかを判定します</summary>
+		/// <param name="bmp">表示対象画像</param>
+		/// <param name="mat">表示マトリックス</param>
+		/// <returns>手動描画を使用する場合、true</returns>
+		private static bool ShouldUseManualNearestDraw(Bitmap bmp, Matrix mat)
+		{
+			if (bmp == null || mat == null) return false;
+			if (bmp.PixelFormat != PixelFormat.Format24bppRgb) return false;
+
+			var elm = mat.Elements;
+			if (Math.Abs(elm[1]) > 0.0001f || Math.Abs(elm[2]) > 0.0001f) return false;
+			if (elm[0] <= 0.0f || elm[3] <= 0.0f) return false;
+
+			var dispWidth = Math.Abs((double)bmp.Width * elm[0]);
+			var dispHeight = Math.Abs((double)bmp.Height * elm[3]);
+			return bmp.Width > GdiDrawLimitPixels || bmp.Height > GdiDrawLimitPixels || dispWidth > GdiDrawLimitPixels || dispHeight > GdiDrawLimitPixels;
+		}
+
+
+		/// <summary>
+		/// ピクチャーボックスの表示画像を差し替えます</summary>
+		/// <param name="image">新しい表示画像</param>
+		private void ReplacePictureBoxImage(Bitmap image)
+		{
+			_mainImage.Graph?.Dispose();
+			_mainImage.Graph = null;
+			var oldImage = _pictBox.Image;
+			_pictBox.Image = image;
+			oldImage?.Dispose();
+		}
+
+
+		/// <summary>
+		/// 表示範囲の画像を最近傍で手動描画します</summary>
+		/// <param name="source">表示対象画像</param>
+		/// <param name="dest">描画先画像</param>
+		/// <param name="mat">表示マトリックス</param>
+		/// <returns>描画に成功した場合、true</returns>
+		private static unsafe bool DrawVisibleImageNearest(Bitmap source, Bitmap dest, Matrix mat)
+		{
+			if (source == null || dest == null || mat == null) return false;
+			if (source.PixelFormat != PixelFormat.Format24bppRgb) return false;
+
+			var destBpp = Image.GetPixelFormatSize(dest.PixelFormat) / 8;
+			if (destBpp != 3 && destBpp != 4) return false;
+
+			var elm = mat.Elements;
+			var scaleX = elm[0];
+			var scaleY = elm[3];
+			var transX = elm[4];
+			var transY = elm[5];
+			if (scaleX <= 0.0f || scaleY <= 0.0f) return false;
+
+			BitmapData sourceData = null;
+			BitmapData destData = null;
+			try
+			{
+				sourceData = source.LockBits(new Rectangle(0, 0, source.Width, source.Height), ImageLockMode.ReadOnly, source.PixelFormat);
+				destData = dest.LockBits(new Rectangle(0, 0, dest.Width, dest.Height), ImageLockMode.ReadWrite, dest.PixelFormat);
+
+				var sourceBase = (byte*)sourceData.Scan0;
+				var destBase = (byte*)destData.Scan0;
+				var sourceStride = sourceData.Stride;
+				var destStride = destData.Stride;
+
+				for (var y = 0; y < dest.Height; y++)
+				{
+					var sourceY = (int)Math.Floor((y - transY) / scaleY);
+					if (sourceY < 0 || sourceY >= source.Height) continue;
+
+					var sourceRow = GetBitmapRowPointer(sourceBase, sourceStride, source.Height, sourceY);
+					var destRow = GetBitmapRowPointer(destBase, destStride, dest.Height, y);
+					for (var x = 0; x < dest.Width; x++)
+					{
+						var sourceX = (int)Math.Floor((x - transX) / scaleX);
+						if (sourceX < 0 || sourceX >= source.Width) continue;
+
+						var sourcePixel = sourceRow + sourceX * 3;
+						var destPixel = destRow + x * destBpp;
+						destPixel[0] = sourcePixel[0];
+						destPixel[1] = sourcePixel[1];
+						destPixel[2] = sourcePixel[2];
+						if (destBpp == 4) destPixel[3] = 255;
+					}
+				}
+				return true;
+			}
+			catch
+			{
+				return false;
+			}
+			finally
+			{
+				if (destData != null) dest.UnlockBits(destData);
+				if (sourceData != null) source.UnlockBits(sourceData);
+			}
+		}
+
+
+		/// <summary>
+		/// BitmapDataの指定行ポインタを取得します</summary>
+		/// <param name="basePtr">BitmapData.Scan0</param>
+		/// <param name="stride">BitmapData.Stride</param>
+		/// <param name="height">Bitmapの高さ</param>
+		/// <param name="y">取得する行番号</param>
+		/// <returns>指定行ポインタ</returns>
+		private static unsafe byte* GetBitmapRowPointer(byte* basePtr, int stride, int height, int y)
+		{
+			return stride >= 0 ? basePtr + y * stride : basePtr + (height - 1 - y) * -stride;
+		}
+
+
+		/// <summary>
+		/// 表示に必要な元画像矩形と描画先矩形を作成します</summary>
+		/// <param name="bmp">表示対象画像</param>
+		/// <param name="mat">表示マトリックス</param>
+		/// <param name="drawSize">描画先サイズ</param>
+		/// <param name="sourceRect">元画像矩形</param>
+		/// <param name="destRect">描画先矩形</param>
+		/// <returns>描画対象がある場合、true</returns>
+		private static bool TryCreateVisibleDrawRect(Bitmap bmp, Matrix mat, Size drawSize, out RectangleF sourceRect, out RectangleF destRect)
+		{
+			sourceRect = RectangleF.Empty;
+			destRect = RectangleF.Empty;
+			if (bmp == null || mat == null || drawSize.Width <= 0 || drawSize.Height <= 0) return false;
+
+			using (var invertedMat = (Matrix)mat.Clone())
+			{
+				if (invertedMat.IsInvertible == false) return false;
+
+				var displayBounds = new[]
+				{
+					new PointF(0, 0),
+					new PointF(drawSize.Width, 0),
+					new PointF(0, drawSize.Height),
+					new PointF(drawSize.Width, drawSize.Height)
+				};
+				invertedMat.Invert();
+				invertedMat.TransformPoints(displayBounds);
+
+				var sourceBounds = CreateBounds(displayBounds);
+				var left = Math.Max(0.0f, (float)Math.Floor(sourceBounds.Left) - 1.0f);
+				var top = Math.Max(0.0f, (float)Math.Floor(sourceBounds.Top) - 1.0f);
+				var right = Math.Min((float)bmp.Width, (float)Math.Ceiling(sourceBounds.Right) + 1.0f);
+				var bottom = Math.Min((float)bmp.Height, (float)Math.Ceiling(sourceBounds.Bottom) + 1.0f);
+				if (right <= left || bottom <= top) return false;
+
+				sourceRect = RectangleF.FromLTRB(left, top, right, bottom);
+			}
+
+			var sourcePoints = new[]
+			{
+				new PointF(sourceRect.Left, sourceRect.Top),
+				new PointF(sourceRect.Right, sourceRect.Top),
+				new PointF(sourceRect.Left, sourceRect.Bottom),
+				new PointF(sourceRect.Right, sourceRect.Bottom)
+			};
+			mat.TransformPoints(sourcePoints);
+			destRect = CreateBounds(sourcePoints);
+
+			return destRect.Width > 0.0f && destRect.Height > 0.0f;
+		}
+
+
+		/// <summary>
+		/// 指定された点群を含む矩形を作成します</summary>
+		/// <param name="points">点群</param>
+		/// <returns>指定された点群を含む矩形</returns>
+		private static RectangleF CreateBounds(PointF[] points)
+		{
+			var minX = points.Min(p => p.X);
+			var minY = points.Min(p => p.Y);
+			var maxX = points.Max(p => p.X);
+			var maxY = points.Max(p => p.Y);
+			return RectangleF.FromLTRB(minX, minY, maxX, maxY);
+		}
+
 
 		/// <summary>
 		/// マトリックスを取得します。
@@ -790,12 +1006,12 @@ namespace ColorImageViewProject
 
 		/// <summary>メインピクチャーボックスのイメージ変更</summary>
 		/// <param name="img"> 表示対象画像</param>
-		public void ChangeMainImage(Bitmap img)
+		public void ChangeMainImage(Bitmap img, bool isCloneImage = true)
 		{
 			//            DevelopLog.LogINF(MethodBase.GetCurrentMethod(), String.Format("メインのイメージが切り替え。 サイズ({0},{1}), 解像度({2:##0.0},{3:##0.0})", img.Width, img.Height, img.HorizontalResolution, img.VerticalResolution));
 			if (img == null) { SetNoImage(); return; }
 			_isNoImageMode = false;
-			_mainImage.Bmap = img;
+			_mainImage.SetBmap(img, isCloneImage);
 			DrawMainImage();
 			ChangedMainImageMatrix();
 			// 描画領域の通知
@@ -1062,6 +1278,8 @@ namespace ColorImageViewProject
         protected Graphics _graph = null;
         protected Matrix _mat = new Matrix();
         protected PictureBox _pbox = null;
+		/// <summary>ビットマップをこのインスタンスが破棄するかどうかを保持します</summary>
+		protected bool _isBmapOwner = true;
 		protected double _maxRateMainImage = 10;		// 10倍
 		protected double _minRateMainImage = 0.1;		// 0.1倍
 
@@ -1072,15 +1290,26 @@ namespace ColorImageViewProject
 			get { return _bmap; }
             set
             {
-				var newBitmap = value != null ? (Bitmap)value.Clone() : null;
-                _bmap?.Dispose();
-                _bmap = newBitmap;
-                if (IsFixed == false || IsPowerFlag == true)	// 画面サイズFixモードでなければ、Matrixを初期化する
-                {
-					if (_bmap != null) ResetMatrix();
-                }
-
+				SetBmap(value, true);
             }
+		}
+
+
+		/// <summary>
+		/// 表示されるビットマップデータを設定します</summary>
+		/// <param name="value">表示されるビットマップデータ</param>
+		/// <param name="isCloneImage">画像をクローンして保持するかどうか</param>
+		public void SetBmap(Bitmap value, bool isCloneImage)
+		{
+			var newBitmap = value != null && isCloneImage ? (Bitmap)value.Clone() : value;
+			if (_isBmapOwner) _bmap?.Dispose();
+			_bmap = newBitmap;
+			_isBmapOwner = value == null || isCloneImage;
+
+			if (IsFixed == false || IsPowerFlag == true)	// 画面サイズFixモードでなければ、Matrixを初期化する
+			{
+				if (_bmap != null) ResetMatrix();
+			}
 		}
 
 
@@ -1089,8 +1318,9 @@ namespace ColorImageViewProject
 		/// </summary>
 		public void SetNoImage()
 		{
-			if (_bmap != null) _bmap.Dispose();
+			if (_isBmapOwner && _bmap != null) _bmap.Dispose();
 			_bmap = null;
+			_isBmapOwner = true;
 		}
 
 
@@ -1415,8 +1645,9 @@ namespace ColorImageViewProject
 			_graph?.Dispose();
 			_graph = null;
 
-			_bmap?.Dispose();
+			if (_isBmapOwner) _bmap?.Dispose();
 			_bmap = null;
+			_isBmapOwner = true;
 
 			_mat?.Dispose();
 			_mat = null;

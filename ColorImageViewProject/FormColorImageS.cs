@@ -11,6 +11,8 @@ using System.Text.RegularExpressions;
 using System.Drawing.Drawing2D;
 using System.IO;
 using System.Runtime.Versioning;
+using System.Threading;
+using System.Threading.Tasks;
 
 
 
@@ -48,6 +50,12 @@ namespace ColorImageViewProject
 
 		/// <summary>表示対象画像(24bit)を保持します</summary>
 		private Bitmap _sourceImage;
+
+		/// <summary>ドラッグドロップ画像を読み込み中かどうかを保持します</summary>
+		private bool _isOpeningDroppedImages;
+
+		/// <summary>表示対象画像を表示コントロールと共有するかどうかを保持します</summary>
+		private bool _isUseSourceImageDirectly;
 
 
 		/// <summary>キー入力待ちするか否かの情報を保持します</summary>
@@ -129,9 +137,10 @@ namespace ColorImageViewProject
 		/// <param name="onClosed">フォームをクローズするときに呼び出されるアクションを指定します</param>
 		/// <param name="isFitWidth">画像フィット情報（初期表示情報がないときのみ有効）　横フィットを指定：true, 縦フィット：false, 全面：null（無指定時）</param>
 		/// <param name="isProfileFunction">プロファイル機能関連のコントロールの有効・無効（デフォルト有効）</param>
-		/// <remarks>指定画像・設定値などの指定パラメータはコンストラクタ内でクローンを生成するため、指定後は呼び出し側で破棄可能。</remarks>
+		/// <param name="isTakeOwnership">指定画像の所有権を受け取るかどうか</param>
+		/// <remarks>isTakeOwnershipがfalseの場合、指定画像・設定値などの指定パラメータはコンストラクタ内でクローンを生成するため、指定後は呼び出し側で破棄可能。</remarks>
 //		[SupportedOSPlatform("windows")]
-		public FormColorImageS(Bitmap bmp, string title, bool isHitAnyKey = false, int posX = -1, int posY = -1, string initDispInfoString= null, ColImageSetteings setdata= null, Icon icon= null, Action　onClosed = null, bool? isFitWidth= null, bool isProfileFunction= true )
+		public FormColorImageS(Bitmap bmp, string title, bool isHitAnyKey = false, int posX = -1, int posY = -1, string initDispInfoString= null, ColImageSetteings setdata= null, Icon icon= null, Action　onClosed = null, bool? isFitWidth= null, bool isProfileFunction= true, bool isTakeOwnership = false )
 		{
 			InitializeComponent();
 
@@ -139,7 +148,8 @@ namespace ColorImageViewProject
 			
 			_settings = (setdata != null)? (ColImageSetteings)setdata.Clone() : new ColImageSetteings();
 			this.Text = title;
-			_sourceImage = (Bitmap)bmp.Clone();
+			_sourceImage = isTakeOwnership ? bmp : (Bitmap)bmp.Clone();
+			_isUseSourceImageDirectly = isTakeOwnership;
 			_isHitAnyKey = isHitAnyKey;
 
 			// 位置が指定されていれば、指定位置に表示する
@@ -187,6 +197,126 @@ namespace ColorImageViewProject
 		}
 
 
+		/// <summary>
+		/// 指定された画像ファイル群を非同期で読み込み、表示フォームとして開きます</summary>
+		/// <param name="owner">進捗フォームのオーナー</param>
+		/// <param name="filePaths">画像ファイルパス群</param>
+		/// <param name="icon">表示フォームに設定するアイコン</param>
+		/// <param name="onClosed">表示フォームクローズ時に呼び出すアクション</param>
+		/// <returns>画像オープン結果</returns>
+		[SupportedOSPlatform("windows")]
+		static public async Task<ImageFilesOpenResult> OpenImageFilesAsync(Form owner, IEnumerable<string> filePaths, Icon icon, Action onClosed = null)
+		{
+			var files = filePaths?.Where(w => String.IsNullOrWhiteSpace(w) == false).ToArray() ?? Array.Empty<string>();
+			var result = new ImageFilesOpenResult();
+			var failureList = new List<(string FileName, string Reason)>();
+			if (files.Length < 1)
+			{
+				return result;
+			}
+
+			using (var cancelSource = new CancellationTokenSource())
+			using (var progressForm = new FormImageLoadProgress())
+			{
+				progressForm.CancelRequested += (sender, e) => cancelSource.Cancel();
+				progressForm.SetProgress(0, files.Length, "");
+				ShowImageLoadProgressForm(progressForm, owner);
+
+				for (var i = 0; i < files.Length; i++)
+				{
+					if (cancelSource.IsCancellationRequested)
+					{
+						result.IsCanceled = true;
+						break;
+					}
+
+					var filePath = files[i];
+					var displayName = Path.GetFileName(filePath);
+					progressForm.SetCurrentFile(i + 1, files.Length, displayName);
+
+					var loadResult = await Task.Run(() =>
+					{
+						var isSuccess = UtilityGraphics.TryLoadBitmapFilePF(filePath, PixelFormat.Format24bppRgb, out var bmp, out var fileName, out var failureReason);
+						return (IsSuccess: isSuccess, Bmp: bmp, FileName: fileName, FailureReason: failureReason);
+					});
+
+					if (cancelSource.IsCancellationRequested)
+					{
+						loadResult.Bmp?.Dispose();
+						result.IsCanceled = true;
+						break;
+					}
+
+					if (loadResult.IsSuccess)
+					{
+						var bmp = loadResult.Bmp;
+						loadResult.Bmp = null;
+						try
+						{
+							progressForm.SetCurrentFile(i + 1, files.Length, $"{loadResult.FileName} 表示準備中");
+							var frm = new FormColorImageS(bmp, loadResult.FileName, false, -1, -1, null, null, icon, onClosed, null, true, true);
+							bmp = null;
+							frm.Show();
+							result.OpenCount++;
+						}
+						finally
+						{
+							bmp?.Dispose();
+						}
+					}
+					else
+					{
+						failureList.Add((loadResult.FileName, loadResult.FailureReason));
+					}
+
+					progressForm.SetProgress(i + 1, files.Length, loadResult.FileName);
+				}
+
+				progressForm.Close();
+			}
+
+			result.Failures = failureList.ToArray();
+			return result;
+		}
+
+
+		/// <summary>
+		/// 画像読み込み進捗フォームを表示します</summary>
+		/// <param name="progressForm">進捗フォーム</param>
+		/// <param name="owner">進捗フォームのオーナー</param>
+		private static void ShowImageLoadProgressForm(FormImageLoadProgress progressForm, Form owner)
+		{
+			if (owner != null && owner.IsDisposed == false && owner.Visible)
+			{
+				progressForm.Show(owner);
+			}
+			else
+			{
+				progressForm.StartPosition = FormStartPosition.CenterScreen;
+				progressForm.Show();
+			}
+			progressForm.Refresh();
+		}
+
+
+		/// <summary>
+		/// 複数画像読み込み結果を表示します</summary>
+		/// <param name="result">画像オープン結果</param>
+		private static void ShowImageLoadResult(ImageFilesOpenResult result)
+		{
+			if (result == null) return;
+			if (result.OpenCount > 0 && result.IsCanceled == false && (result.Failures == null || result.Failures.Length == 0)) return;
+
+			var failures = result.Failures ?? Array.Empty<(string FileName, string Reason)>();
+			var message = UtilityGraphics.CreateLoadBitmapFilesMessage(result.OpenCount, failures, result.IsCanceled);
+			if (String.IsNullOrWhiteSpace(message)) message = "有効な画像ファイルが見つかりませんでした。";
+
+			var icon = result.OpenCount == 0 && result.IsCanceled == false ? MessageBoxIcon.Error : MessageBoxIcon.Warning;
+			var title = result.OpenCount == 0 && result.IsCanceled == false ? "画像読み込みエラー" : "画像読み込み結果";
+			MessageBox.Show(message, title, MessageBoxButtons.OK, icon);
+		}
+
+
 		/// <summary>フォームロード時の処理です</summary>
 		/// <param name="sender">送信元情報</param>
 		/// <param name="e">イベント情報</param>
@@ -210,7 +340,7 @@ namespace ColorImageViewProject
 			_scalePbox.BasePbox.BackColor = _settings != null ? _settings.BackColor : Color.Black ;
 			_scalePbox.InterpolationMode = _settings!= null ? _settings.MainInterpolationMode: InterpolationMode.NearestNeighbor;
 			_scalePbox.InterpolationModeReduce = _settings != null ? _settings.MainInterpolationModeReduce : InterpolationMode.HighQualityBilinear;
-			_scalePbox.ChangeMainImage(_sourceImage);
+			_scalePbox.ChangeMainImage(_sourceImage, _isUseSourceImageDirectly == false);
 			_scalePbox.SizeChanged();
 
 			lblImageSize.Text= _sourceImage.Size.ToString();
@@ -266,35 +396,29 @@ namespace ColorImageViewProject
 		/// <param name="sender">送信元情報</param>
 		/// <param name="e">イベント情報</param>
 		/// <remarks>画像ファイルを別ウィンドウ（サブウィンドウ）で開きます</remarks>
-		private void FormMain_DragDrop(object sender, DragEventArgs e)
+		private async void FormMain_DragDrop(object sender, DragEventArgs e)
 		{
             try
             {
                 //ドロップされたデータがFileDrop型か調べる
                 if (e.Data.GetDataPresent(DataFormats.FileDrop))
                 {
-                    var args = (string[])e.Data.GetData(DataFormats.FileDrop);
-                    var images = UtilityGraphics.LoadBitmapFilesPF(args, PixelFormat.Format24bppRgb, out var failures);
-                    if (images.Length == 0)
-                    {
-                        var message = UtilityGraphics.CreateLoadBitmapFilesMessage(images.Length, failures);
-                        if (String.IsNullOrWhiteSpace(message)) message = "有効な画像ファイルが見つかりませんでした。";
-                        MessageBox.Show(message, "画像読み込みエラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        return;
-                    }
-
-                    foreach (var image in images)
-                    {
-                        using (image.Bmp)
-                        {
-                            var frm = new FormColorImageS(image.Bmp, image.FileName, false, -1, -1, null, null, this.Icon);
-                            frm.Show();
-                        }
-                    }
-
-					if (failures.Length > 0)
+					if (_isOpeningDroppedImages)
 					{
-						MessageBox.Show(UtilityGraphics.CreateLoadBitmapFilesMessage(images.Length, failures), "画像読み込み結果", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+						MessageBox.Show("画像読み込み中です。完了してから再度実行してください。", "画像読み込み", MessageBoxButtons.OK, MessageBoxIcon.Information);
+						return;
+					}
+
+                    var args = (string[])e.Data.GetData(DataFormats.FileDrop);
+					_isOpeningDroppedImages = true;
+					try
+					{
+						var result = await OpenImageFilesAsync(this, args, this.Icon);
+						ShowImageLoadResult(result);
+					}
+					finally
+					{
+						_isOpeningDroppedImages = false;
 					}
                 }
             }
@@ -1074,18 +1198,18 @@ namespace ColorImageViewProject
 		[SupportedOSPlatform("windows")]
 		private void FormColorImageS_FormClosed(object sender, FormClosedEventArgs e)
 		{
-			if (_sourceImage != null)
-			{
-				_sourceImage.Dispose();
-				_sourceImage = null;
-			}
-
 			DeleteProfileForm();
 
 			if (_scalePbox != null)
 			{
 				_scalePbox.Dispose();
 				_scalePbox = null;
+			}
+
+			if (_sourceImage != null)
+			{
+				_sourceImage.Dispose();
+				_sourceImage = null;
 			}
 
 			// 終了時アクションが指定されていれば呼び出す。
