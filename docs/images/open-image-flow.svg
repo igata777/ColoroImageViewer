@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="330" viewBox="0 0 920 330" role="img" aria-labelledby="title desc">
+  <title id="title">画像を開く操作の流れ</title>
+  <desc id="desc">ドラッグアンドドロップ、クリップボード、コマンドラインから画像情報画面を開く流れを示す模式図</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#3b5b7a"/>
+    </marker>
+    <style>
+      .label { font: 18px sans-serif; fill: #25313b; }
+      .small { font: 14px sans-serif; fill: #425466; }
+      .tiny { font: 12px sans-serif; fill: #5f6f7d; }
+      .box { fill: #f7fbff; stroke: #8fb5d6; stroke-width: 2; rx: 8; }
+      .source { fill: #fff8ea; stroke: #d9a441; stroke-width: 2; rx: 8; }
+      .view { fill: #f4fff6; stroke: #59a96a; stroke-width: 2; rx: 8; }
+      .line { stroke: #3b5b7a; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="920" height="330" fill="#ffffff"/>
+  <text x="36" y="38" class="label">画像を開く操作</text>
+
+  <rect x="45" y="70" width="210" height="70" class="source"/>
+  <text x="70" y="101" class="label">画像ファイル</text>
+  <text x="70" y="124" class="small">D&amp;D / 複数選択</text>
+
+  <rect x="45" y="160" width="210" height="70" class="source"/>
+  <text x="70" y="191" class="label">クリップボード画像</text>
+  <text x="70" y="214" class="small">Ctrl + V / メニュー</text>
+
+  <rect x="45" y="250" width="210" height="50" class="source"/>
+  <text x="70" y="282" class="label">起動引数</text>
+
+  <path d="M 260 105 C 335 105, 340 147, 405 147" class="line"/>
+  <path d="M 260 195 C 330 195, 340 165, 405 165" class="line"/>
+  <path d="M 260 275 C 345 275, 340 186, 405 186" class="line"/>
+
+  <rect x="410" y="105" width="205" height="95" class="box"/>
+  <text x="438" y="143" class="label">ColorImageViewer</text>
+  <text x="438" y="168" class="small">既存インスタンスがあれば</text>
+  <text x="438" y="190" class="small">Named Pipe へ送信</text>
+
+  <path d="M 620 152 C 690 152, 695 152, 745 152" class="line"/>
+
+  <rect x="750" y="88" width="130" height="52" class="view"/>
+  <rect x="765" y="102" width="100" height="24" fill="#c9dff2" stroke="#5e89af"/>
+  <text x="765" y="162" class="small">画像情報画面</text>
+
+  <rect x="750" y="178" width="130" height="52" class="view"/>
+  <rect x="765" y="192" width="100" height="24" fill="#f0d6aa" stroke="#ab7a2b"/>
+  <text x="765" y="252" class="small">画像ごとに新規ビュー</text>
+
+  <text x="412" y="242" class="tiny">開いている画像情報画面へD&amp;Dした場合も、現在のビューは置き換えず新しいビューで開きます。</text>
+</svg>

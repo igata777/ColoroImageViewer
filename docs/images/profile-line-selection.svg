@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="360" viewBox="0 0 920 360" role="img" aria-labelledby="title desc">
+  <title id="title">Lineプロファイル指定</title>
+  <desc id="desc">画像上で始点と終点を指定し、ライン上の画素値をプロファイルグラフとして表示する模式図</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#3b5b7a"/>
+    </marker>
+    <style>
+      .label { font: 18px sans-serif; fill: #25313b; }
+      .small { font: 14px sans-serif; fill: #425466; }
+      .tiny { font: 12px sans-serif; fill: #5f6f7d; }
+      .axis { stroke: #9aa7b1; stroke-width: 1; }
+      .line { stroke: #e5d400; stroke-width: 5; fill: none; }
+      .guide { stroke: #f06b2f; stroke-width: 2; stroke-dasharray: 6 4; }
+      .flow { stroke: #3b5b7a; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="920" height="360" fill="#ffffff"/>
+  <text x="36" y="38" class="label">Line プロファイル</text>
+  <text x="36" y="63" class="small">画像上の2点間をサンプリングし、線上の画素値をグラフ化します。</text>
+
+  <rect x="52" y="95" width="350" height="210" fill="#f5f6f7" stroke="#778899" stroke-width="2"/>
+  <rect x="72" y="120" width="310" height="160" fill="#dde8d6" stroke="#c3d0bb"/>
+  <path d="M72 248 C120 205, 180 222, 235 168 C280 124, 325 148, 382 116" stroke="#91a870" stroke-width="10" fill="none" opacity="0.45"/>
+  <path d="M110 245 L342 130" class="line"/>
+  <line x1="110" y1="225" x2="110" y2="265" class="guide"/>
+  <line x1="342" y1="110" x2="342" y2="150" class="guide"/>
+  <circle cx="110" cy="245" r="8" fill="#d92828"/>
+  <circle cx="342" cy="130" r="8" fill="#64b044"/>
+  <text x="86" y="235" class="small">始点</text>
+  <text x="352" y="124" class="small">終点</text>
+
+  <path d="M 425 200 C 485 200, 495 200, 550 200" class="flow"/>
+
+  <rect x="570" y="95" width="300" height="210" fill="#fbfbfb" stroke="#778899" stroke-width="2"/>
+  <line x1="600" y1="265" x2="850" y2="265" class="axis"/>
+  <line x1="600" y1="120" x2="600" y2="265" class="axis"/>
+  <path d="M600 245 C630 220, 660 238, 690 190 C725 130, 750 165, 785 142 C815 122, 835 155, 850 134" stroke="#222" stroke-width="2" fill="none"/>
+  <line x1="628" y1="118" x2="628" y2="265" class="guide"/>
+  <line x1="810" y1="118" x2="810" y2="265" class="guide"/>
+  <rect x="628" y="118" width="182" height="147" fill="#ffcc66" opacity="0.18"/>
+  <text x="615" y="292" class="small">プロファイルビュー</text>
+  <text x="603" y="319" class="tiny">2点測定ではグラフ上にも始点・終点ラインと範囲が表示されます。</text>
+</svg>

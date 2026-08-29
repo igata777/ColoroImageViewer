@@ -38,7 +38,7 @@ namespace ColorImageViewer
 				else
 				{
 					// 既に起動している場合 - 引数を既存インスタンスに送信。引数なしの場合はカウンタクリアしてメインフォーム表示する。
-					SendFilesToExistingInstanceAsync(args).GetAwaiter().GetResult();
+					SendCommandToExistingInstanceAsync(args).GetAwaiter().GetResult();
 				}
 			}
 		}
@@ -72,11 +72,14 @@ namespace ColorImageViewer
 										{
 											switch (message.Command)
 											{
-												case "open_files":
+												case PipeCommands.OpenFiles:
 													mainForm.OpenFiles(message.Files, false);
 													break;
-												case "clear_counter":
+												case PipeCommands.ClearCounter:
 													mainForm.ClearCounter();
+													break;
+												case PipeCommands.OpenClipboardImage:
+													mainForm.OpenClipboardImage(false);
 													break;
 											}
 										});
@@ -95,8 +98,8 @@ namespace ColorImageViewer
 
 		/// <summary>
 		/// 引数を指定してパイプへのコマンド送信を行います</summary>
-		/// <param name="files">画像ファイル群</param>
-		private static async Task SendFilesToExistingInstanceAsync(string[] files)
+		/// <param name="args">起動引数</param>
+		private static async Task SendCommandToExistingInstanceAsync(string[] args)
         {
             try
             {
@@ -104,7 +107,7 @@ namespace ColorImageViewer
                 {
                     await client.ConnectAsync(5000);
 
-                    var message = (files != null && files.Any()) ? new PipeMessage{ Command = "open_files", Files = files  } : new PipeMessage { Command = "clear_counter" };
+                    var message = CreatePipeMessage(args);
 
                     var jsonMessage = JsonSerializer.Serialize(message);
                     using (var writer = new StreamWriter(client))
@@ -119,12 +122,65 @@ namespace ColorImageViewer
                 MessageBox.Show($"既存のインスタンスとの通信に失敗しました: {ex.Message}");
             }
         }
+
+
+		/// <summary>
+		/// 起動引数からNamed Pipe用メッセージを生成します</summary>
+		/// <param name="args">起動引数</param>
+		/// <returns>Named Pipe用メッセージ</returns>
+		internal static PipeMessage CreatePipeMessage(string[] args)
+		{
+			var values = args?.Where(w => String.IsNullOrWhiteSpace(w) == false).ToArray() ?? Array.Empty<string>();
+			if (values.Any(IsOpenClipboardImageArgument))
+			{
+				return new PipeMessage { Command = PipeCommands.OpenClipboardImage };
+			}
+
+			if (values.Length > 0)
+			{
+				return new PipeMessage { Command = PipeCommands.OpenFiles, Files = values };
+			}
+
+			return new PipeMessage { Command = PipeCommands.ClearCounter };
+		}
+
+
+		/// <summary>
+		/// クリップボード画像オープン用引数かどうかを取得します</summary>
+		/// <param name="arg">起動引数</param>
+		/// <returns>クリップボード画像オープン用引数の場合はtrue</returns>
+		private static bool IsOpenClipboardImageArgument(string arg)
+		{
+			return String.Equals(arg, "--clipboard", StringComparison.OrdinalIgnoreCase)
+				|| String.Equals(arg, "/clipboard", StringComparison.OrdinalIgnoreCase)
+				|| String.Equals(arg, "-clipboard", StringComparison.OrdinalIgnoreCase)
+				|| String.Equals(arg, "--paste", StringComparison.OrdinalIgnoreCase)
+				|| String.Equals(arg, "/paste", StringComparison.OrdinalIgnoreCase)
+				|| String.Equals(arg, "-paste", StringComparison.OrdinalIgnoreCase);
+		}
     }
 
-    // メッセージ用のクラス
+	/// <summary>Named Pipeコマンド名を保持します</summary>
+	internal static class PipeCommands
+	{
+		/// <summary>画像ファイルを開くコマンド名</summary>
+		public const string OpenFiles = "open_files";
+
+		/// <summary>カウンタをクリアするコマンド名</summary>
+		public const string ClearCounter = "clear_counter";
+
+		/// <summary>クリップボード画像を開くコマンド名</summary>
+		public const string OpenClipboardImage = "open_clipboard_image";
+	}
+
+
+	/// <summary>Named Pipeメッセージを保持します</summary>
     public class PipeMessage
     {
-        public string Command { get; set; }
+		/// <summary>Named Pipeコマンド名を保持します</summary>
+        public string Command { get; set; } = PipeCommands.ClearCounter;
+
+		/// <summary>画像ファイルパス群を保持します</summary>
         public string[] Files { get; set; } = Array.Empty<string>();
     }
 }

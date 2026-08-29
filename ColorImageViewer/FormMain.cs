@@ -28,6 +28,9 @@ namespace ColorImageViewer
 		/// <summary>起動時に指定された画像ファイルパス群を保持します</summary>
 		private string[] _initialFilePaths;
 
+		/// <summary>起動時にクリップボード画像を開くかどうかを保持します</summary>
+		private bool _isInitialClipboardImage;
+
 		/// <summary>画像読み込み中かどうかを保持します</summary>
 		private bool _isOpeningImages;
 
@@ -45,13 +48,20 @@ namespace ColorImageViewer
 			try
 			{
                 _count = 0;
-				if (args == null || args.Length < 1)
+				var initialMessage = Program.CreatePipeMessage(args);
+				if (initialMessage.Command == PipeCommands.OpenClipboardImage)
+				{
+					_isInitialClipboardImage = true;
+					return;
+				}
+
+				if (initialMessage.Command != PipeCommands.OpenFiles || initialMessage.Files.Length < 1)
 				{
 					// ドラッグアンドドロップなどで後からファイルを開くためのフォームとして機能する。
 					return;
 				}
 
-				_initialFilePaths = args.ToArray();
+				_initialFilePaths = initialMessage.Files.ToArray();
 			}
 			catch (Exception ex)
 			{
@@ -66,6 +76,13 @@ namespace ColorImageViewer
 		/// <param name="e">イベント情報</param>
 		private async void FormMain_Load(object sender, EventArgs e)
 		{
+			if (_isInitialClipboardImage)
+			{
+				_isInitialClipboardImage = false;
+				OpenClipboardImage(true);
+				return;
+			}
+
 			if (_initialFilePaths != null && _initialFilePaths.Length > 0)
 			{
 				var filePaths = _initialFilePaths;
@@ -114,6 +131,43 @@ namespace ColorImageViewer
 
 
 		/// <summary>
+		/// クリップボード画像を新しい画像フォームで開きます</summary>
+		/// <param name="isInit">初期化時フラグ</param>
+		/// <returns>画像を開けた場合はtrue</returns>
+		public bool OpenClipboardImage(bool isInit)
+		{
+			if (_isOpeningImages)
+			{
+				MessageBox.Show("画像読み込み中です。完了してから再度実行してください。", "画像読み込み", MessageBoxButtons.OK, MessageBoxIcon.Information);
+				return false;
+			}
+
+			_isOpeningImages = true;
+			if (isInit)
+			{
+				_isOpeningInitialFiles = true;
+				SetFormVisible();
+			}
+
+			try
+			{
+				return FormColorImageS.OpenClipboardImage(this, this.Icon, OnClosedImageForm, OnOpenedImageForm);
+			}
+			catch (Exception ex)
+			{
+				MessageBox.Show($"例外が発生しました。 Message={ex.Message}, Stack={ex.StackTrace}", "例外発生", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				return false;
+			}
+			finally
+			{
+				if (isInit) _isOpeningInitialFiles = false;
+				_isOpeningImages = false;
+				SetFormVisible();
+			}
+		}
+
+
+		/// <summary>
 		/// 画像ファイルを非同期で開きます</summary>
 		/// <param name="filePaths">ファイルパス群</param>
 		/// <param name="isInit">初期化時フラグ</param>
@@ -136,8 +190,7 @@ namespace ColorImageViewer
 
 			try
 			{
-				var result = await FormColorImageS.OpenImageFilesAsync(this, filePaths, this.Icon, OnClosedImageForm);
-				if (_count > 0 || isInit) _count += result.OpenCount;
+				var result = await FormColorImageS.OpenImageFilesAsync(this, filePaths, this.Icon, OnClosedImageForm, OnOpenedImageForm);
 				ShowImageLoadResult(result);
 			}
 			catch (Exception ex)
@@ -172,7 +225,15 @@ namespace ColorImageViewer
 
 
 
-        /// <summary>起動時ファイル指定のフォームが閉じたときのイベントです</summary>
+        /// <summary>画像フォームが開いたときのイベントです</summary>
+        /// <remarks>メインフォーム非表示モード時のみカウントを加算する</remarks>
+        private void OnOpenedImageForm()
+		{
+			if (_count > 0 || _isOpeningInitialFiles) _count++;
+		}
+
+
+        /// <summary>画像フォームが閉じたときのイベントです</summary>
         /// <remarks>残りカウントを減算し、0以下になればフォームを閉じる</remarks>
         private void OnClosedImageForm()
 		{
@@ -180,6 +241,23 @@ namespace ColorImageViewer
 			{
 				if (--_count <= 0) Close();
 			}
+		}
+
+
+		/// <summary>
+		/// ショートカットキー入力を処理します</summary>
+		/// <param name="msg">Windowsメッセージ</param>
+		/// <param name="keyData">キー情報</param>
+		/// <returns>処理済みの場合はtrue</returns>
+		protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+		{
+			if (keyData == (Keys.Control | Keys.V))
+			{
+				OpenClipboardImage(false);
+				return true;
+			}
+
+			return base.ProcessCmdKey(ref msg, keyData);
 		}
 
 
@@ -206,12 +284,12 @@ namespace ColorImageViewer
 		{
 			e.Effect = DragDropEffects.None;
 			//ドラッグされているデータがstring型に変換できるか調べ、
-			//そうであればドロップ効果をMoveにする
+			//そうであればドロップ効果をCopyにする
 			if (e.Data.GetDataPresent(DataFormats.FileDrop))
 			{
 				if (((string[])e.Data.GetData(DataFormats.FileDrop)).Length >= 1)
 				{
-					e.Effect = DragDropEffects.Move;
+					e.Effect = DragDropEffects.Copy;
 				}
 
 			}

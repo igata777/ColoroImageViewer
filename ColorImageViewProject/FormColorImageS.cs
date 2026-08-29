@@ -54,10 +54,6 @@ namespace ColorImageViewProject
 		/// <summary>ドラッグドロップ画像を読み込み中かどうかを保持します</summary>
 		private bool _isOpeningDroppedImages;
 
-		/// <summary>表示対象画像を表示コントロールと共有するかどうかを保持します</summary>
-		private bool _isUseSourceImageDirectly;
-
-
 		/// <summary>キー入力待ちするか否かの情報を保持します</summary>
 		private bool _isHitAnyKey;
 		/// <summary>設定情報を保持します</summary>
@@ -70,6 +66,9 @@ namespace ColorImageViewProject
 
 		/// <summary>フォームをクローズするときに呼び出されるアクションを保持します。</summary>
 		private Action _actOnClosed;
+
+		/// <summary>フォームを表示したときに呼び出されるアクションを保持します。</summary>
+		private Action _actOnOpened;
 
 		// <param name="isFitWidth"></param>
 		/// <summary>画像フィット情報を保持します。　横フィットを指定：true, 縦フィット：false, 全面：null</summary>
@@ -119,10 +118,30 @@ namespace ColorImageViewProject
 		/// <summary>ラインプロファイル用カーソルオフセット(距離）を保持します</summary>
 		/// <remarks>ラインは斜めがあるので距離（double型)で表す</remarks>
 		private double? _pcLine;
+
+		/// <summary>ラインプロファイル用範囲開始オフセットを保持します</summary>
+		private double? _pcLineRangeB;
+
+		/// <summary>ラインプロファイル用範囲終了オフセットを保持します</summary>
+		private double? _pcLineRangeE;
+
 		/// <summary>ボックス水平プロファイル用カーソルオフセットを保持します</summary>
 		private int? _pcBoxH;
+
+		/// <summary>ボックス水平プロファイル用範囲開始オフセットを保持します</summary>
+		private int? _pcBoxHRangeB;
+
+		/// <summary>ボックス水平プロファイル用範囲終了オフセットを保持します</summary>
+		private int? _pcBoxHRangeE;
+
 		/// <summary>ボックス垂直プロファイル用カーソルオフセットを保持します</summary>
 		private int? _pcBoxV;
+
+		/// <summary>ボックス垂直プロファイル用範囲開始オフセットを保持します</summary>
+		private int? _pcBoxVRangeB;
+
+		/// <summary>ボックス垂直プロファイル用範囲終了オフセットを保持します</summary>
+		private int? _pcBoxVRangeE;
 
 
 		/// <summary>コンストラクタです</summary>
@@ -138,18 +157,19 @@ namespace ColorImageViewProject
 		/// <param name="isFitWidth">画像フィット情報（初期表示情報がないときのみ有効）　横フィットを指定：true, 縦フィット：false, 全面：null（無指定時）</param>
 		/// <param name="isProfileFunction">プロファイル機能関連のコントロールの有効・無効（デフォルト有効）</param>
 		/// <param name="isTakeOwnership">指定画像の所有権を受け取るかどうか</param>
+		/// <param name="onOpened">フォームを表示したときに呼び出されるアクションを指定します</param>
 		/// <remarks>isTakeOwnershipがfalseの場合、指定画像・設定値などの指定パラメータはコンストラクタ内でクローンを生成するため、指定後は呼び出し側で破棄可能。</remarks>
 //		[SupportedOSPlatform("windows")]
-		public FormColorImageS(Bitmap bmp, string title, bool isHitAnyKey = false, int posX = -1, int posY = -1, string initDispInfoString= null, ColImageSetteings setdata= null, Icon icon= null, Action　onClosed = null, bool? isFitWidth= null, bool isProfileFunction= true, bool isTakeOwnership = false )
+		public FormColorImageS(Bitmap bmp, string title, bool isHitAnyKey = false, int posX = -1, int posY = -1, string initDispInfoString= null, ColImageSetteings setdata= null, Icon icon= null, Action　onClosed = null, bool? isFitWidth= null, bool isProfileFunction= true, bool isTakeOwnership = false, Action onOpened = null )
 		{
 			InitializeComponent();
+			InitializeClipboardImageOpenMenuItem();
 
 			_debLabelPos = new Point(this.Width - labelDispInfo.Location.X, this.Height - labelDispInfo.Location.Y);
 			
 			_settings = (setdata != null)? (ColImageSetteings)setdata.Clone() : new ColImageSetteings();
 			this.Text = title;
 			_sourceImage = isTakeOwnership ? bmp : (Bitmap)bmp.Clone();
-			_isUseSourceImageDirectly = isTakeOwnership;
 			_isHitAnyKey = isHitAnyKey;
 
 			// 位置が指定されていれば、指定位置に表示する
@@ -163,6 +183,7 @@ namespace ColorImageViewProject
 			if (icon != null) this.Icon = (Icon)icon.Clone();
 
 			_actOnClosed = onClosed;
+			_actOnOpened = onOpened;
 
 			_isFitImageWidth = isFitWidth;
 
@@ -174,7 +195,7 @@ namespace ColorImageViewProject
 
 			// 
 			_opacityNumber = MaxOpcityNumber;     // 100% = this.Opacity = _opacityNumber * (1.0-MinOpcityValue)/MaxOpcityNumber + MinOpcityValue; 
-			_pcLine = _pcBoxH = _pcBoxV = null;
+			ClearProfileCursorMarks();
 
 		}
 
@@ -198,14 +219,119 @@ namespace ColorImageViewProject
 
 
 		/// <summary>
+		/// クリップボード画像を新しい表示フォームとして開きます</summary>
+		/// <param name="owner">メッセージ表示時のオーナー</param>
+		/// <param name="icon">表示フォームに設定するアイコン</param>
+		/// <param name="onClosed">表示フォームクローズ時に呼び出すアクション</param>
+		/// <param name="onOpened">表示フォームオープン時に呼び出すアクション</param>
+		/// <returns>画像を開けた場合はtrue</returns>
+		[SupportedOSPlatform("windows")]
+		static public bool OpenClipboardImage(Form owner, Icon icon, Action onClosed = null, Action onOpened = null)
+		{
+			Bitmap bmp = null;
+			try
+			{
+				if (Clipboard.ContainsImage() == false)
+				{
+					ShowClipboardImageMessage(owner, "クリップボードに画像がありません。", MessageBoxIcon.Information);
+					return false;
+				}
+
+				using (var image = Clipboard.GetImage())
+				{
+					if (image == null)
+					{
+						ShowClipboardImageMessage(owner, "クリップボード画像を取得できませんでした。", MessageBoxIcon.Warning);
+						return false;
+					}
+
+					bmp = CreateBitmapFromClipboardImage(image);
+				}
+
+				var frm = new FormColorImageS(bmp, CreateClipboardImageTitle(), false, -1, -1, null, null, icon, onClosed, null, true, true, onOpened);
+				bmp = null;
+				frm.Show();
+				onOpened?.Invoke();
+				return true;
+			}
+			catch (Exception ex)
+			{
+				ShowClipboardImageMessage(owner, $"クリップボード画像を開けませんでした。 Message={ex.Message}", MessageBoxIcon.Error);
+				return false;
+			}
+			finally
+			{
+				bmp?.Dispose();
+			}
+		}
+
+
+		/// <summary>
+		/// クリップボード画像関連のメッセージを表示します</summary>
+		/// <param name="owner">メッセージ表示時のオーナー</param>
+		/// <param name="message">メッセージ</param>
+		/// <param name="icon">メッセージアイコン</param>
+		private static void ShowClipboardImageMessage(Form owner, string message, MessageBoxIcon icon)
+		{
+			const string title = "クリップボード画像";
+			if (owner != null && owner.IsDisposed == false && owner.Visible)
+			{
+				MessageBox.Show(owner, message, title, MessageBoxButtons.OK, icon);
+				return;
+			}
+
+			MessageBox.Show(message, title, MessageBoxButtons.OK, icon);
+		}
+
+
+		/// <summary>
+		/// クリップボード画像から表示用Bitmapを生成します</summary>
+		/// <param name="image">クリップボードから取得した画像</param>
+		/// <returns>表示用Bitmap</returns>
+		private static Bitmap CreateBitmapFromClipboardImage(Image image)
+		{
+			var bmp = new Bitmap(image.Width, image.Height, PixelFormat.Format24bppRgb);
+			try
+			{
+				if (image.HorizontalResolution > 0 && image.VerticalResolution > 0)
+				{
+					bmp.SetResolution(image.HorizontalResolution, image.VerticalResolution);
+				}
+			}
+			catch
+			{
+				// 解像度情報が不正な画像でも表示は継続する。
+			}
+
+			using (var g = Graphics.FromImage(bmp))
+			{
+				g.Clear(Color.White);
+				g.DrawImage(image, new Rectangle(0, 0, bmp.Width, bmp.Height), 0, 0, image.Width, image.Height, GraphicsUnit.Pixel);
+			}
+
+			return bmp;
+		}
+
+
+		/// <summary>
+		/// クリップボード画像用の表示タイトルを生成します</summary>
+		/// <returns>表示タイトル</returns>
+		private static string CreateClipboardImageTitle()
+		{
+			return $"ClipboardImage_{DateTime.Now:yyyyMMdd_HHmmss_fff}";
+		}
+
+
+		/// <summary>
 		/// 指定された画像ファイル群を非同期で読み込み、表示フォームとして開きます</summary>
 		/// <param name="owner">進捗フォームのオーナー</param>
 		/// <param name="filePaths">画像ファイルパス群</param>
 		/// <param name="icon">表示フォームに設定するアイコン</param>
 		/// <param name="onClosed">表示フォームクローズ時に呼び出すアクション</param>
+		/// <param name="onOpened">表示フォームオープン時に呼び出すアクション</param>
 		/// <returns>画像オープン結果</returns>
 		[SupportedOSPlatform("windows")]
-		static public async Task<ImageFilesOpenResult> OpenImageFilesAsync(Form owner, IEnumerable<string> filePaths, Icon icon, Action onClosed = null)
+		static public async Task<ImageFilesOpenResult> OpenImageFilesAsync(Form owner, IEnumerable<string> filePaths, Icon icon, Action onClosed = null, Action onOpened = null)
 		{
 			var files = filePaths?.Where(w => String.IsNullOrWhiteSpace(w) == false).ToArray() ?? Array.Empty<string>();
 			var result = new ImageFilesOpenResult();
@@ -254,9 +380,10 @@ namespace ColorImageViewProject
 						try
 						{
 							progressForm.SetCurrentFile(i + 1, files.Length, $"{loadResult.FileName} 表示準備中");
-							var frm = new FormColorImageS(bmp, loadResult.FileName, false, -1, -1, null, null, icon, onClosed, null, true, true);
+							var frm = new FormColorImageS(bmp, loadResult.FileName, false, -1, -1, null, null, icon, onClosed, null, true, true, onOpened);
 							bmp = null;
 							frm.Show();
+							onOpened?.Invoke();
 							result.OpenCount++;
 						}
 						finally
@@ -340,7 +467,7 @@ namespace ColorImageViewProject
 			_scalePbox.BasePbox.BackColor = _settings != null ? _settings.BackColor : Color.Black ;
 			_scalePbox.InterpolationMode = _settings!= null ? _settings.MainInterpolationMode: InterpolationMode.NearestNeighbor;
 			_scalePbox.InterpolationModeReduce = _settings != null ? _settings.MainInterpolationModeReduce : InterpolationMode.HighQualityBilinear;
-			_scalePbox.ChangeMainImage(_sourceImage, _isUseSourceImageDirectly == false);
+			_scalePbox.ChangeMainImage(_sourceImage, false);
 			_scalePbox.SizeChanged();
 
 			lblImageSize.Text= _sourceImage.Size.ToString();
@@ -380,6 +507,38 @@ namespace ColorImageViewProject
 
 
 		/// <summary>
+		/// クリップボード画像を開くメニュー項目を追加します</summary>
+		private void InitializeClipboardImageOpenMenuItem()
+		{
+			var menuItem = new ToolStripMenuItem("クリップボード画像を新しいビューで開く");
+			menuItem.Click += クリップボード画像を新しいビューで開くToolStripMenuItem_Click;
+			contextMenuStripL.Items.Insert(0, new ToolStripSeparator());
+			contextMenuStripL.Items.Insert(0, menuItem);
+		}
+
+
+		/// <summary>
+		/// クリップボード画像を新しいビューで開きます</summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		[SupportedOSPlatform("windows")]
+		private void クリップボード画像を新しいビューで開くToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			OpenClipboardImage(this, this.Icon, _actOnClosed, _actOnOpened);
+		}
+
+
+		/// <summary>
+		/// 関連画像フォームを表示し、表示完了アクションを呼び出します</summary>
+		/// <param name="frm">表示対象フォーム</param>
+		private void ShowLinkedImageForm(FormColorImageS frm)
+		{
+			frm.Show();
+			_actOnOpened?.Invoke();
+		}
+
+
+		/// <summary>
 		/// 指定したIcon（の複製）をアイコンとして設定します
 		/// </summary>
 		/// <param name="icon">アイコン</param>
@@ -413,7 +572,7 @@ namespace ColorImageViewProject
 					_isOpeningDroppedImages = true;
 					try
 					{
-						var result = await OpenImageFilesAsync(this, args, this.Icon);
+						var result = await OpenImageFilesAsync(this, args, this.Icon, _actOnClosed, _actOnOpened);
 						ShowImageLoadResult(result);
 					}
 					finally
@@ -437,12 +596,12 @@ namespace ColorImageViewProject
 		{
 			e.Effect = DragDropEffects.None;
 			//ドラッグされているデータがstring型に変換できるか調べ、
-			//そうであればドロップ効果をMoveにする
+			//そうであればドロップ効果をCopyにする
 			if (e.Data.GetDataPresent(DataFormats.FileDrop))
 			{
 				if (((string[])e.Data.GetData(DataFormats.FileDrop)).Length >= 1)
 				{
-					e.Effect = DragDropEffects.Move;
+					e.Effect = DragDropEffects.Copy;
 				}
 
 			}
@@ -492,6 +651,7 @@ namespace ColorImageViewProject
 			// プロファイルモードで Ctrl+クリック（コントロールキーが押されているかつダウン）時の振る舞い
 			if (_isProfModeLine != null && (Control.ModifierKeys & Keys.Control) == Keys.Control && down)
 			{
+				ClearProfileCursorMarks();
 				if (_measureModePointB == null)
 				{
 					_measureModePointB = new Point(x, y);
@@ -801,8 +961,8 @@ namespace ColorImageViewProject
 			if (MessageBox.Show("表示部分以外の領域はトリミングされますが、よろしいですか？", "確認", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) == System.Windows.Forms.DialogResult.OK)
 			{
 				var str = FormColorImageS.CreateDispInfoString(0, 0, 1.0f, _scalePbox.BasePbox.Width, _scalePbox.BasePbox.Height);
-				var frm = new FormColorImageS((Bitmap)pboxColImage.Image, this.Text + "(Copy)", false, -1, -1, str, _settings, this.Icon );
-				frm.Show();
+				var frm = new FormColorImageS((Bitmap)pboxColImage.Image, this.Text + "(Copy)", false, -1, -1, str, _settings, this.Icon, _actOnClosed, onOpened: _actOnOpened);
+				ShowLinkedImageForm(frm);
 			}
 		}
 
@@ -837,8 +997,8 @@ namespace ColorImageViewProject
 			if (_sourceImage == null) return;
 			var rect = _scalePbox.GetDispRect();
 			var str = FormColorImageS.CreateDispInfoString(rect.X, rect.Y, _scalePbox.DispRate, _scalePbox.BasePbox.Width, _scalePbox.BasePbox.Height);
-			var frm = new FormColorImageS(_sourceImage, this.Text + "(Copy)", false, -1, -1, str, _settings, this.Icon);
-			frm.Show();
+			var frm = new FormColorImageS(_sourceImage, this.Text + "(Copy)", false, -1, -1, str, _settings, this.Icon, _actOnClosed, onOpened: _actOnOpened);
+			ShowLinkedImageForm(frm);
 		}
 
 
@@ -1377,8 +1537,8 @@ namespace ColorImageViewProject
 					pen.Alignment = PenAlignment.Outset;	
 					gra.DrawRectangleFs(pen, new[] { _scalePbox.GetDispRect() });
 				}
-				var frm = new FormColorImageS(bmp, this.Text + "表示領域", false, -1, -1, null, _settings);
-				frm.Show();
+				var frm = new FormColorImageS(bmp, this.Text + "表示領域", false, -1, -1, null, _settings, null, _actOnClosed, onOpened: _actOnOpened);
+				ShowLinkedImageForm(frm);
 			}
 
 		}
@@ -1514,6 +1674,27 @@ namespace ColorImageViewProject
 		}
 
 
+		/// <summary>
+		/// プロファイル表示カーソル情報をクリアします</summary>
+		private void ClearProfileCursorMarks()
+		{
+			ClearProfilePointCursors();
+			_pcLineRangeB = _pcLineRangeE = null;
+			_pcBoxHRangeB = _pcBoxHRangeE = null;
+			_pcBoxVRangeB = _pcBoxVRangeE = null;
+		}
+
+
+		/// <summary>
+		/// プロファイル表示の1点カーソル情報をクリアします</summary>
+		private void ClearProfilePointCursors()
+		{
+			_pcLine = null;
+			_pcBoxH = null;
+			_pcBoxV = null;
+		}
+
+
 
 
 
@@ -1536,16 +1717,14 @@ namespace ColorImageViewProject
 				if (isLine)
 				{
 					g.DrawLine(pen, pob, poe);
+					using (var penC = new Pen(Color.Orange, wid))
+					{
+						DrawLineProfileRangeCursors(g, pob, poe, penC, pcSiz);
+					}
+
 					if (_pcLine != null)
 					{
-						var xx = (double)(poe.X - pob.X);
-						var yy = (double)(poe.Y - pob.Y);
-						var ww = Math.Sqrt(xx * xx + yy * yy);
-						xx /= ww;
-						yy /= ww;
-						var rr = new RectangleF( pob.X + (float)(xx * _pcLine.Value) - pcSiz, pob.Y + (float)(yy * _pcLine.Value) - pcSiz, pcSiz * 2, pcSiz * 2 );
-						g.FillRectangle(Brushes.Orange, rr); 
-
+						DrawLineProfilePointCursor(g, pob, poe, _pcLine.Value, pcSiz);
 					}
 				}
 				else
@@ -1554,11 +1733,131 @@ namespace ColorImageViewProject
 					{
 						var rect = CreateFRectFromMeasurePoint(pob, poe); // 描画用
 						g.DrawRectangle(pen, rect);
+						DrawBoxProfileRangeCursors(g, rect, penC);
 						if (_pcBoxH != null) g.DrawLine(penC, rect.X + _pcBoxH.Value, rect.Y, rect.X + _pcBoxH.Value, rect.Y + rect.Height);
 						if (_pcBoxV != null) g.DrawLine(penC, rect.X, rect.Y + _pcBoxV.Value, rect.X + rect.Width, rect.Y + _pcBoxV.Value);
 					}
 				}
 			}
+		}
+
+
+		/// <summary>
+		/// ラインプロファイル範囲カーソルを描画します</summary>
+		/// <param name="g">グラフィックス</param>
+		/// <param name="pob">開始位置</param>
+		/// <param name="poe">終了位置</param>
+		/// <param name="pen">描画ペン</param>
+		/// <param name="pcSiz">ポイントカーソルサイズ</param>
+		private void DrawLineProfileRangeCursors(Graphics g, Point pob, Point poe, Pen pen, float pcSiz)
+		{
+			if (_pcLineRangeB == null || _pcLineRangeE == null) return;
+			if (TryGetLineProfileUnitVector(pob, poe, out var xx, out var yy) == false) return;
+
+			DrawLineProfileRangeCursor(g, pob, xx, yy, _pcLineRangeB.Value, pen, pcSiz);
+			DrawLineProfileRangeCursor(g, pob, xx, yy, _pcLineRangeE.Value, pen, pcSiz);
+		}
+
+
+		/// <summary>
+		/// ラインプロファイル範囲カーソル1本を描画します</summary>
+		/// <param name="g">グラフィックス</param>
+		/// <param name="pob">開始位置</param>
+		/// <param name="xx">ライン方向X単位ベクトル</param>
+		/// <param name="yy">ライン方向Y単位ベクトル</param>
+		/// <param name="dist">開始位置からの距離</param>
+		/// <param name="pen">描画ペン</param>
+		/// <param name="pcSiz">ポイントカーソルサイズ</param>
+		private void DrawLineProfileRangeCursor(Graphics g, Point pob, double xx, double yy, double dist, Pen pen, float pcSiz)
+		{
+			var cx = pob.X + (float)(xx * dist);
+			var cy = pob.Y + (float)(yy * dist);
+			var nx = -yy;
+			var ny = xx;
+			var halfLength = pcSiz * 3.0f;
+			g.DrawLine(pen, cx - (float)(nx * halfLength), cy - (float)(ny * halfLength), cx + (float)(nx * halfLength), cy + (float)(ny * halfLength));
+		}
+
+
+		/// <summary>
+		/// ラインプロファイル1点カーソルを描画します</summary>
+		/// <param name="g">グラフィックス</param>
+		/// <param name="pob">開始位置</param>
+		/// <param name="poe">終了位置</param>
+		/// <param name="dist">開始位置からの距離</param>
+		/// <param name="pcSiz">ポイントカーソルサイズ</param>
+		private void DrawLineProfilePointCursor(Graphics g, Point pob, Point poe, double dist, float pcSiz)
+		{
+			if (TryGetLineProfileUnitVector(pob, poe, out var xx, out var yy) == false) return;
+			var rr = new RectangleF(pob.X + (float)(xx * dist) - pcSiz, pob.Y + (float)(yy * dist) - pcSiz, pcSiz * 2, pcSiz * 2);
+			g.FillRectangle(Brushes.Orange, rr);
+		}
+
+
+		/// <summary>
+		/// ラインプロファイルの単位ベクトルを取得します</summary>
+		/// <param name="pob">開始位置</param>
+		/// <param name="poe">終了位置</param>
+		/// <param name="xx">ライン方向X単位ベクトル</param>
+		/// <param name="yy">ライン方向Y単位ベクトル</param>
+		/// <returns>取得できた場合はtrue</returns>
+		private bool TryGetLineProfileUnitVector(Point pob, Point poe, out double xx, out double yy)
+		{
+			xx = poe.X - pob.X;
+			yy = poe.Y - pob.Y;
+			var ww = Math.Sqrt(xx * xx + yy * yy);
+			if (ww <= Double.Epsilon) return false;
+
+			xx /= ww;
+			yy /= ww;
+			return true;
+		}
+
+
+		/// <summary>
+		/// ボックスプロファイル範囲カーソルを描画します</summary>
+		/// <param name="g">グラフィックス</param>
+		/// <param name="rect">描画対象矩形</param>
+		/// <param name="pen">描画ペン</param>
+		private void DrawBoxProfileRangeCursors(Graphics g, RectangleF rect, Pen pen)
+		{
+			if (_pcBoxHRangeB != null && _pcBoxHRangeE != null)
+			{
+				DrawBoxProfileVerticalRangeCursor(g, rect, _pcBoxHRangeB.Value, pen);
+				DrawBoxProfileVerticalRangeCursor(g, rect, _pcBoxHRangeE.Value, pen);
+			}
+
+			if (_pcBoxVRangeB != null && _pcBoxVRangeE != null)
+			{
+				DrawBoxProfileHorizontalRangeCursor(g, rect, _pcBoxVRangeB.Value, pen);
+				DrawBoxProfileHorizontalRangeCursor(g, rect, _pcBoxVRangeE.Value, pen);
+			}
+		}
+
+
+		/// <summary>
+		/// ボックスプロファイル範囲の垂直カーソルを描画します</summary>
+		/// <param name="g">グラフィックス</param>
+		/// <param name="rect">描画対象矩形</param>
+		/// <param name="offset">矩形左端からのオフセット</param>
+		/// <param name="pen">描画ペン</param>
+		private void DrawBoxProfileVerticalRangeCursor(Graphics g, RectangleF rect, int offset, Pen pen)
+		{
+			var x = Math.Max(rect.Left, Math.Min(rect.Right, rect.X + offset));
+			g.DrawLine(pen, x, rect.Top, x, rect.Bottom);
+		}
+
+
+		/// <summary>
+		/// ボックスプロファイル範囲の水平カーソルを描画します</summary>
+		/// <param name="g">グラフィックス</param>
+		/// <param name="rect">描画対象矩形</param>
+		/// <param name="offset">矩形上端からのオフセット</param>
+		/// <param name="pen">描画ペン</param>
+		private void DrawBoxProfileHorizontalRangeCursor(Graphics g, RectangleF rect, int offset, Pen pen)
+		{
+			var y = Math.Max(rect.Top, Math.Min(rect.Bottom, rect.Y + offset));
+			g.DrawLine(pen, rect.Left, y, rect.Right, y);
 		}
 
 
@@ -1639,7 +1938,84 @@ namespace ColorImageViewProject
 				_formProfViewerBoxV.Dispose();
 				_formProfViewerBoxV = null;
 			}
-			_pcLine = _pcBoxH = _pcBoxV = null;
+			ClearProfileCursorMarks();
+		}
+
+
+		/// <summary>
+		/// ラインプロファイル1点カーソル変更時の処理です</summary>
+		/// <param name="dist">ライン始点からの距離</param>
+		private void OnLineProfileCursorChanged(double dist)
+		{
+			_pcLine = dist;
+		}
+
+
+		/// <summary>
+		/// ラインプロファイル範囲変更時の処理です</summary>
+		/// <param name="distB">範囲開始位置</param>
+		/// <param name="distE">範囲終了位置</param>
+		private void OnLineProfileRangeChanged(double? distB, double? distE)
+		{
+			_pcLineRangeB = distB;
+			_pcLineRangeE = distE;
+			if (distB == null && distE == null) _pcLine = null;
+			_scalePbox.DrawMainImage();
+		}
+
+
+		/// <summary>
+		/// ボックス水平プロファイル1点カーソル変更時の処理です</summary>
+		/// <param name="xofs">矩形左端からのオフセット</param>
+		private void OnBoxHProfileCursorChanged(double xofs)
+		{
+			_pcBoxH = (int)Math.Round(xofs);
+		}
+
+
+		/// <summary>
+		/// ボックス水平プロファイル範囲変更時の処理です</summary>
+		/// <param name="xofsB">範囲開始位置</param>
+		/// <param name="xofsE">範囲終了位置</param>
+		private void OnBoxHProfileRangeChanged(double? xofsB, double? xofsE)
+		{
+			_pcBoxHRangeB = RoundProfileOffset(xofsB);
+			_pcBoxHRangeE = RoundProfileOffset(xofsE);
+			if (xofsB == null && xofsE == null) _pcBoxH = null;
+			_scalePbox.DrawMainImage();
+		}
+
+
+		/// <summary>
+		/// ボックス垂直プロファイル1点カーソル変更時の処理です</summary>
+		/// <param name="yofs">矩形上端からのオフセット</param>
+		private void OnBoxVProfileCursorChanged(double yofs)
+		{
+			_pcBoxV = (int)Math.Round(yofs);
+		}
+
+
+		/// <summary>
+		/// ボックス垂直プロファイル範囲変更時の処理です</summary>
+		/// <param name="yofsB">範囲開始位置</param>
+		/// <param name="yofsE">範囲終了位置</param>
+		private void OnBoxVProfileRangeChanged(double? yofsB, double? yofsE)
+		{
+			_pcBoxVRangeB = RoundProfileOffset(yofsB);
+			_pcBoxVRangeE = RoundProfileOffset(yofsE);
+			if (yofsB == null && yofsE == null) _pcBoxV = null;
+			_scalePbox.DrawMainImage();
+		}
+
+
+		/// <summary>
+		/// プロファイル距離を整数オフセットに変換します</summary>
+		/// <param name="offset">プロファイル距離</param>
+		/// <returns>整数オフセット</returns>
+		private int? RoundProfileOffset(double? offset)
+		{
+			if (offset == null) return null;
+			return (int)Math.Round(offset.Value);
 		}
 
 
@@ -1678,7 +2054,7 @@ namespace ColorImageViewProject
 		private void CreateProfileForm(bool isForce )
 		{
 			// カーソルクリア
-			_pcLine = _pcBoxH = _pcBoxV = null;
+			ClearProfilePointCursors();
 
 			if (_isProfModeLine == null) 
 			{
@@ -1692,7 +2068,7 @@ namespace ColorImageViewProject
 				var pData = CalcLineProfile( out var distance );
 				if (_formProfViewerLine == null)
 				{
-					_formProfViewerLine = new FormProfileViewer(pData, "ラインプロファイル", null, distance, this.Icon, new Action<double>((dist)=> { _pcLine = dist; _scalePbox.DrawMainImage(); }) );
+					_formProfViewerLine = new FormProfileViewer(pData, "ラインプロファイル", null, distance, this.Icon, OnLineProfileCursorChanged, OnLineProfileRangeChanged);
 					_formProfViewerLine.Show();
 				}
 				else{
@@ -1709,7 +2085,7 @@ namespace ColorImageViewProject
 				var pDataH = CalcBoxHProfile();
 				if (_formProfViewerBoxH == null)
 				{
-					_formProfViewerBoxH = new FormProfileViewer(pDataH, "水平プロファイル", null, 0.0, this.Icon, new Action<double>((xofs) => { _pcBoxH = (int)Math.Round(xofs); _scalePbox.DrawMainImage(); }));
+					_formProfViewerBoxH = new FormProfileViewer(pDataH, "水平プロファイル", null, 0.0, this.Icon, OnBoxHProfileCursorChanged, OnBoxHProfileRangeChanged);
 					_formProfViewerBoxH.Show();
 				}
 				else
@@ -1721,7 +2097,7 @@ namespace ColorImageViewProject
 				var pDataV = CalcBoxVProfile();
 				if (_formProfViewerBoxV == null)
 				{
-					_formProfViewerBoxV = new FormProfileViewer(pDataV, "垂直プロファイル", null, 0.0, this.Icon, new Action<double>((yofs) => { _pcBoxV = (int)Math.Round(yofs); _scalePbox.DrawMainImage(); }));
+					_formProfViewerBoxV = new FormProfileViewer(pDataV, "垂直プロファイル", null, 0.0, this.Icon, OnBoxVProfileCursorChanged, OnBoxVProfileRangeChanged);
 					_formProfViewerBoxV.Show();
 				}
 				else
@@ -2288,8 +2664,8 @@ namespace ColorImageViewProject
 
 			using (var bmp = _sourceImage.Clone(rect, PixelFormat.Format24bppRgb))
 			{
-				var frm = new FormColorImageS(bmp, String.Format("トリミング {0}", rect.ToString()).Replace( ',', '_'), false, -1, -1, null, null, this.Icon);
-				frm.Show();
+				var frm = new FormColorImageS(bmp, String.Format("トリミング {0}", rect.ToString()).Replace( ',', '_'), false, -1, -1, null, null, this.Icon, _actOnClosed, onOpened: _actOnOpened);
+				ShowLinkedImageForm(frm);
 			}
 		}
 

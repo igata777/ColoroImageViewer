@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="330" viewBox="0 0 920 330" role="img" aria-labelledby="title desc">
+  <title id="title">プロファイル上の2点測定</title>
+  <desc id="desc">プロファイルグラフ上で2点を指定し、範囲統計と差分を確認する模式図</desc>
+  <style>
+    .label { font: 18px sans-serif; fill: #25313b; }
+    .small { font: 14px sans-serif; fill: #425466; }
+    .tiny { font: 12px sans-serif; fill: #5f6f7d; }
+    .grid { stroke: #d0d6dc; stroke-width: 1; }
+    .grid2 { stroke: #b6d6ec; stroke-width: 2; }
+    .curve { stroke: #111; stroke-width: 2; fill: none; }
+    .range { fill: #ffcc66; opacity: 0.22; }
+    .start { stroke: #ff8a00; stroke-width: 2; stroke-dasharray: 6 4; }
+    .end { stroke: #c53a2d; stroke-width: 2; stroke-dasharray: 6 4; }
+  </style>
+  <rect width="920" height="330" fill="#ffffff"/>
+  <text x="36" y="38" class="label">プロファイル上の 2 点測定</text>
+  <text x="36" y="63" class="small">1点目と2点目を指定すると、差分・傾き・範囲統計を同時に確認できます。</text>
+
+  <rect x="48" y="90" width="600" height="190" fill="#fbfbfb" stroke="#778899" stroke-width="2"/>
+  <g>
+    <line x1="48" y1="232" x2="648" y2="232" class="grid2"/>
+    <line x1="48" y1="184" x2="648" y2="184" class="grid"/>
+    <line x1="48" y1="136" x2="648" y2="136" class="grid2"/>
+    <line x1="148" y1="90" x2="148" y2="280" class="grid"/>
+    <line x1="248" y1="90" x2="248" y2="280" class="grid"/>
+    <line x1="348" y1="90" x2="348" y2="280" class="grid"/>
+    <line x1="448" y1="90" x2="448" y2="280" class="grid"/>
+    <line x1="548" y1="90" x2="548" y2="280" class="grid"/>
+  </g>
+  <rect x="178" y="90" width="330" height="190" class="range"/>
+  <line x1="178" y1="90" x2="178" y2="280" class="start"/>
+  <line x1="508" y1="90" x2="508" y2="280" class="end"/>
+  <path d="M48 242 C80 210, 118 255, 150 214 C180 178, 208 205, 240 172 C285 128, 332 195, 380 156 C425 120, 455 142, 500 116 C548 88, 600 150, 648 126" class="curve"/>
+  <text x="166" y="304" class="small">A</text>
+  <text x="496" y="304" class="small">B</text>
+
+  <rect x="690" y="105" width="185" height="112" fill="#f7fbff" stroke="#8fb5d6" stroke-width="2" rx="8"/>
+  <text x="710" y="137" class="small">表示される内容</text>
+  <text x="710" y="162" class="tiny">A/Bインデックス</text>
+  <text x="710" y="183" class="tiny">ΔIdx / ΔX / ΔGray</text>
+  <text x="710" y="204" class="tiny">傾き・範囲統計</text>
+  <text x="690" y="256" class="tiny">左ドラッグで2点目を連続更新、Escでクリアします。</text>
+</svg>

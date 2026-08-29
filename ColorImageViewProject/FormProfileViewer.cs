@@ -29,6 +29,18 @@ namespace ColorImageViewProject
 		/// <summary>最後にクリックした点のインデックスを保持します。（null時は非表示） </summary>
 		private double? _lastDist;
 
+		/// <summary>プロファイル2点測定の開始位置を保持します</summary>
+		private double? _measureDistB;
+
+		/// <summary>プロファイル2点測定の終了位置を保持します</summary>
+		private double? _measureDistE;
+
+		/// <summary>プロファイル全体統計を表示するテキストボックスを保持します</summary>
+		private TextBox _tboxProfileStatistics;
+
+		/// <summary>プロファイル2点測定結果を表示するテキストボックスを保持します</summary>
+		private TextBox _tboxMeasureStatistics;
+
 		/// <summary指定されたピクセルデータ全体の距離（長さ）を保持します</summary>
 		/// <remarks>指定されたピクセルデータ群は傾きがあるラインの場合には、ピクセル距離とピクセル数が一致しないため外側から指定する</remarks>
 		private double _distDatas;
@@ -53,6 +65,9 @@ namespace ColorImageViewProject
 		/// <summary>クリックしたときに呼び出されるアクションを保持します。nullの場合には何も行いません。 OnClickAction( double dis/*距離*/ ) </summary>
 		private Action<double> _onClickAction;
 
+		/// <summary>2点測定範囲を変更したときに呼び出されるアクションを保持します</summary>
+		private Action<double?, double?> _onMeasureRangeAction;
+
 		/// <summary>クローズ処理を無視するフラグです</summary>
 		public bool IsIgnoreClose { get; set; }
 
@@ -65,9 +80,11 @@ namespace ColorImageViewProject
 		/// <param name="distance">距離。（省略時は0.0=データの長さと同じ）</param>
 		/// <param name="ic">アイコン</param>
 		/// <param name="onClick">クリック時のコールバックアクション　　OnClick(int idx)</param>
-		public FormProfileViewer(Color[] datas, string title, Action onClosing = null, double distance = 0.0, Icon ic = null, Action<double> onClick = null)
+		/// <param name="onMeasureRange">2点測定範囲変更時のコールバックアクション</param>
+		public FormProfileViewer(Color[] datas, string title, Action onClosing = null, double distance = 0.0, Icon ic = null, Action<double> onClick = null, Action<double?, double?> onMeasureRange = null)
 		{
 			InitializeComponent();
+			InitializeProfileAnalysisControls();
 
 			_matWorkPbox = new Matrix();
 			SetData(datas, distance, false);
@@ -77,10 +94,67 @@ namespace ColorImageViewProject
 			this.Text = title;
 			if (ic != null) this.Icon = ic;
 			_onClickAction = onClick;
+			_onMeasureRangeAction = onMeasureRange;
 			_lastDist = null;
 
 			// キーを一旦フォームが受け取る
 			this.KeyPreview = true;
+		}
+
+
+		/// <summary>
+		/// プロファイル解析情報表示用コントロールを初期化します</summary>
+		private void InitializeProfileAnalysisControls()
+		{
+			const int extraHeight = 60;
+			var graphHeight = pboxGraph.Height;
+			var graphAnchor = pboxGraph.Anchor;
+			var lowerControls = Controls.Cast<Control>().Where(w => w != pboxGraph && w.Top >= pboxGraph.Bottom).ToArray();
+			var lowerControlAnchors = lowerControls.Select(w => (Control: w, Anchor: w.Anchor)).ToArray();
+			SuspendLayout();
+
+			pboxGraph.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+			foreach (var item in lowerControlAnchors)
+			{
+				item.Control.Anchor = item.Anchor & ~AnchorStyles.Bottom;
+			}
+
+			ClientSize = new Size(ClientSize.Width, ClientSize.Height + extraHeight);
+			pboxGraph.Height = graphHeight;
+			pboxGraph.Anchor = graphAnchor;
+			foreach (var item in lowerControlAnchors)
+			{
+				item.Control.Top += extraHeight;
+				item.Control.Anchor = item.Anchor;
+			}
+
+			_tboxProfileStatistics = CreateProfileAnalysisTextBox(pboxGraph.Bottom + 4);
+			_tboxMeasureStatistics = CreateProfileAnalysisTextBox(_tboxProfileStatistics.Bottom + 3);
+			Controls.Add(_tboxProfileStatistics);
+			Controls.Add(_tboxMeasureStatistics);
+
+			ResumeLayout(false);
+			PerformLayout();
+		}
+
+
+		/// <summary>
+		/// プロファイル解析情報表示用テキストボックスを生成します</summary>
+		/// <param name="top">上端位置</param>
+		/// <returns>プロファイル解析情報表示用テキストボックス</returns>
+		private TextBox CreateProfileAnalysisTextBox(int top)
+		{
+			return new TextBox
+			{
+				Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
+				BackColor = SystemColors.Window,
+				BorderStyle = BorderStyle.FixedSingle,
+				Location = new Point(pboxGraph.Left, top),
+				Name = $"tboxProfileAnalysis{top}",
+				ReadOnly = true,
+				Size = new Size(pboxGraph.Width, 19),
+				TabStop = false
+			};
 		}
 
 
@@ -140,6 +214,7 @@ namespace ColorImageViewProject
 			_posGraphColR = _posGraphColG = _posGraphColB = _posGraphColHw = _posGraphColS = null;
 			labelIdxColInf.Text = "";
 			_lastDist = null;
+			_measureDistB = _measureDistE = null;
 
 			// 変数群にセットする。　無効の場合には黒の256データとしてセットする。
 			_colorDatas = datas ?? new Color[0]; // (datas ?? ( Enumerable.Repeat( Color.Black, 256 ))).ToArray();
@@ -182,6 +257,8 @@ namespace ColorImageViewProject
 				else labelDist.Visible = tboxDist.Visible = false;
 			}
 
+			UpdateProfileAnalysisText();
+
 			// データ描画
 			DrawData();
 		}
@@ -191,7 +268,8 @@ namespace ColorImageViewProject
 		/// グラフデータを描画します</summary>
 		public void DrawData()
 		{
-			if (_matWorkPbox == null) return;
+			if (_matWorkPbox == null || _bmpWorkPbox == null || _graWorkPbox == null) return;
+			if (_bmpWorkPbox.Width <= 0 || _bmpWorkPbox.Height <= 0 || _distDatas <= 0.0) return;
 			// 座標設定
 			_matWorkPbox.Reset();
 			_matWorkPbox.Translate(0f, _bmpWorkPbox.Height, MatrixOrder.Prepend);              // 平行移動
@@ -208,6 +286,9 @@ namespace ColorImageViewProject
 		/// グラフを描画します。（有効な全データ対象）</summary>
 		private void DrawAllGraph()
 		{
+			if (_graWorkPbox == null || _bmpWorkPbox == null || _matWorkPbox == null) return;
+			if (_bmpWorkPbox.Width <= 0 || _bmpWorkPbox.Height <= 0) return;
+
 			_graWorkPbox.Clear(Color.White);
 
 			var ofsH = 0;
@@ -265,19 +346,6 @@ namespace ColorImageViewProject
 				}
 			}
 
-			// インデックスの表示
-			if (_lastDist != null && _lastDist >= 0)
-			{
-				using (var iPen = new Pen(Color.Orange, 1f))
-				{
-					var pov = new PointF[] { new PointF((float)_lastDist.Value, 0) };
-					_matWorkPbox.TransformPoints(pov);
-					_graWorkPbox.DrawLine(iPen, pov[0].X, (float)0, pov[0].X, (float)_bmpWorkPbox.Height);
-				}
-			}
-
-
-
 			// データの描画
 			// B,G,R,Grayの順で描画する。（上書きされるので、同じ位置では後側が優先となる）
 			if (cboxIsDrawColB.Checked && _posGraphColB != null) DrawGraphMat(_posGraphColB, new Pen(Color.Blue));
@@ -291,6 +359,55 @@ namespace ColorImageViewProject
 				var posGraphColH = _posGraphColHw.Select((hw, i) => new PointF(hw.X, _posGraphColS[i].Y == 0 ? 0 : ((hw.Y + 360 - ofsH) % 360) / 360f * 256f)).ToArray();
 				DrawGraphMat(posGraphColH, new Pen(Color.Magenta));
 			}
+
+			DrawProfileCursorMarks();
+		}
+
+
+		/// <summary>
+		/// プロファイルグラフ上のカーソル・2点測定位置を描画します</summary>
+		private void DrawProfileCursorMarks()
+		{
+			if (_graWorkPbox == null || _matWorkPbox == null || _bmpWorkPbox == null) return;
+
+			if (_measureDistB != null && _measureDistE != null)
+			{
+				var xB = DistanceToGraphX(_measureDistB.Value);
+				var xE = DistanceToGraphX(_measureDistE.Value);
+				var left = Math.Min(xB, xE);
+				var right = Math.Max(xB, xE);
+				using (var brush = new SolidBrush(Color.FromArgb(28, Color.Orange)))
+				using (var penB = new Pen(Color.DarkOrange, 1f))
+				using (var penE = new Pen(Color.DarkRed, 1f))
+				{
+					penB.DashStyle = DashStyle.Dash;
+					penE.DashStyle = DashStyle.Dash;
+					_graWorkPbox.FillRectangle(brush, left, 0f, right - left, _bmpWorkPbox.Height);
+					_graWorkPbox.DrawLine(penB, xB, 0f, xB, _bmpWorkPbox.Height);
+					_graWorkPbox.DrawLine(penE, xE, 0f, xE, _bmpWorkPbox.Height);
+				}
+			}
+
+			if (_lastDist != null && _lastDist >= 0)
+			{
+				using (var iPen = new Pen(Color.Orange, 1f))
+				{
+					var x = DistanceToGraphX(_lastDist.Value);
+					_graWorkPbox.DrawLine(iPen, x, 0f, x, _bmpWorkPbox.Height);
+				}
+			}
+		}
+
+
+		/// <summary>
+		/// プロファイル距離をグラフX座標に変換します</summary>
+		/// <param name="dist">プロファイル距離</param>
+		/// <returns>グラフX座標</returns>
+		private float DistanceToGraphX(double dist)
+		{
+			var pov = new PointF[] { new PointF((float)dist, 0f) };
+			_matWorkPbox.TransformPoints(pov);
+			return pov[0].X;
 		}
 
 
@@ -365,8 +482,15 @@ namespace ColorImageViewProject
 		{
 			// 元のワークは破棄し、ピクチャーボックスと同じサイズのビットマップを生成する。
 			var pbox = pboxGraph as PictureBox;
-			if (_graWorkPbox != null) _graWorkPbox.Dispose();
-			if (_bmpWorkPbox != null) _bmpWorkPbox.Dispose();
+			var oldGraphics = _graWorkPbox;
+			var oldBitmap = _bmpWorkPbox;
+			_graWorkPbox = null;
+			_bmpWorkPbox = null;
+			pboxGraph.Image = null;
+			oldGraphics?.Dispose();
+			oldBitmap?.Dispose();
+			if (pbox == null || pbox.Width <= 0 || pbox.Height <= 0) return;
+
 			_bmpWorkPbox = new Bitmap(pbox.Width, pbox.Height, PixelFormat.Format24bppRgb);
 			_graWorkPbox = Graphics.FromImage(_bmpWorkPbox);
 			pboxGraph.Image = _bmpWorkPbox;
@@ -542,6 +666,146 @@ namespace ColorImageViewProject
 
 
 		/// <summary>
+		/// プロファイル解析情報表示を更新します</summary>
+		private void UpdateProfileAnalysisText()
+		{
+			if (_tboxProfileStatistics == null || _tboxMeasureStatistics == null) return;
+			_tboxProfileStatistics.Text = CreateProfileStatisticsText("全体", 0, (_colorDatas?.Length ?? 0) - 1);
+			_tboxMeasureStatistics.Text = CreateProfileMeasureText();
+		}
+
+
+		/// <summary>
+		/// プロファイル統計表示文字列を生成します</summary>
+		/// <param name="title">表示タイトル</param>
+		/// <param name="bgnIdx">開始インデックス</param>
+		/// <param name="endIdx">終了インデックス</param>
+		/// <returns>プロファイル統計表示文字列</returns>
+		private string CreateProfileStatisticsText(string title, int bgnIdx, int endIdx)
+		{
+			if (_colorDatas == null || _colorDatas.Length == 0) return $"{title}: ----";
+
+			var bgn = Math.Max(0, Math.Min(bgnIdx, endIdx));
+			var end = Math.Min(_colorDatas.Length - 1, Math.Max(bgnIdx, endIdx));
+			if (end < bgn) return $"{title}: ----";
+
+			var count = end - bgn + 1;
+			var minGray = Int32.MaxValue;
+			var maxGray = Int32.MinValue;
+			var sumGray = 0.0;
+			var sumGray2 = 0.0;
+			var sumR = 0.0;
+			var sumG = 0.0;
+			var sumB = 0.0;
+			for (var i = bgn; i <= end; i++)
+			{
+				var col = _colorDatas[i];
+				var gray = RgbToGray(col.R, col.G, col.B);
+				if (gray < minGray) minGray = gray;
+				if (gray > maxGray) maxGray = gray;
+				sumGray += gray;
+				sumGray2 += (double)gray * gray;
+				sumR += col.R;
+				sumG += col.G;
+				sumB += col.B;
+			}
+
+			var meanGray = sumGray / count;
+			var varianceGray = Math.Max(0.0, sumGray2 / count - meanGray * meanGray);
+			var sdGray = Math.Sqrt(varianceGray);
+			return $"{title}: N={count}, Gray[min/max/mean/sd]={minGray}/{maxGray}/{meanGray:0.0}/{sdGray:0.0}, RGB平均=({sumR / count:0.0}, {sumG / count:0.0}, {sumB / count:0.0})";
+		}
+
+
+		/// <summary>
+		/// プロファイル2点測定表示文字列を生成します</summary>
+		/// <returns>プロファイル2点測定表示文字列</returns>
+		private string CreateProfileMeasureText()
+		{
+			if (_colorDatas == null || _colorDatas.Length == 0) return "2点: ----";
+			if (_measureDistB == null || _measureDistE == null) return "2点: 1点目を左クリック、2点目を左クリックまたはドラッグで指定します。Escでクリア。";
+
+			var idxB = DistanceToIndex(_measureDistB.Value);
+			var idxE = DistanceToIndex(_measureDistE.Value);
+			if (idxB < 0 || idxE < 0) return "2点: 1点目を左クリック、2点目を左クリックまたはドラッグで指定します。Escでクリア。";
+
+			var colB = _colorDatas[idxB];
+			var colE = _colorDatas[idxE];
+			var grayB = RgbToGray(colB.R, colB.G, colB.B);
+			var grayE = RgbToGray(colE.R, colE.G, colE.B);
+			var deltaDist = _measureDistE.Value - _measureDistB.Value;
+			var deltaGray = grayE - grayB;
+			var slope = Math.Abs(deltaDist) > Double.Epsilon ? deltaGray / deltaDist : 0.0;
+			var rangeText = CreateProfileStatisticsText("範囲", idxB, idxE);
+			return $"2点: A={idxB}, B={idxE}, ΔIdx={idxE - idxB}, ΔX={deltaDist:0.00}, Gray={grayB}->{grayE}, ΔGray={deltaGray}, 傾き={slope:0.000}; {rangeText}";
+		}
+
+
+		/// <summary>
+		/// プロファイル距離をデータインデックスに変換します</summary>
+		/// <param name="dist">プロファイル距離</param>
+		/// <returns>データインデックス</returns>
+		private int DistanceToIndex(double dist)
+		{
+			if (_colorDatas == null || _colorDatas.Length == 0 || _distDatas <= 0.0) return -1;
+			var idx = (int)(dist / _distDatas * _colorDatas.Length);
+			if (idx < 0) return 0;
+			if (idx >= _colorDatas.Length) return _colorDatas.Length - 1;
+			return idx;
+		}
+
+
+		/// <summary>
+		/// プロファイルグラフ座標から距離とインデックスを取得します</summary>
+		/// <param name="x">グラフX座標</param>
+		/// <param name="y">グラフY座標</param>
+		/// <param name="dist">プロファイル距離</param>
+		/// <param name="idx">データインデックス</param>
+		/// <returns>取得できた場合はtrue</returns>
+		private bool TryGetProfilePosition(int x, int y, out double dist, out int idx)
+		{
+			dist = 0.0;
+			idx = -1;
+			if (_colorDatas == null || _colorDatas.Length == 0 || _matWorkPbox == null) return false;
+
+			using (var inv = _matWorkPbox.Clone())
+			{
+				if (inv.IsInvertible == false) return false;
+				inv.Invert();
+				var pv = new PointF[] { new PointF(x, y) };
+				inv.TransformPoints(pv);
+				dist = pv[0].X;
+				idx = DistanceToIndex(dist);
+				return dist >= 0.0 && dist < _distDatas && idx >= 0 && idx < _colorDatas.Length;
+			}
+		}
+
+
+		/// <summary>
+		/// プロファイル2点測定位置を更新します</summary>
+		/// <param name="dist">プロファイル距離</param>
+		/// <param name="isDrag">ドラッグ更新の場合true</param>
+		private void UpdateMeasureDistance(double dist, bool isDrag)
+		{
+			if (isDrag && _measureDistB != null)
+			{
+				_measureDistE = dist;
+				return;
+			}
+
+			if (_lastDist == null)
+			{
+				_measureDistB = dist;
+				_measureDistE = null;
+				return;
+			}
+
+			_measureDistB = _lastDist;
+			_measureDistE = dist;
+		}
+
+
+		/// <summary>
 		/// キーが押されたときの処理です</summary>
 		/// <param name="sender">送信元情報</param>
 		/// <param name="e">イベント情報</param>
@@ -553,8 +817,12 @@ namespace ColorImageViewProject
 				case Keys.Escape:
 					labelIdxColInf.Text = "";
 					_lastDist = null;
+					_measureDistB = _measureDistE = null;
+					UpdateProfileAnalysisText();
+					_onMeasureRangeAction?.Invoke(null, null);
 					DrawAllGraph();
 					Refresh();
+					e.Handled = true;
 					break;
 			}
 		}
@@ -567,25 +835,7 @@ namespace ColorImageViewProject
 		/// <param name="e">イベント情報</param>
 		private void pboxGraph_MouseDown(object sender, MouseEventArgs e)
 		{
-
-			if (_colorDatas == null || _colorDatas.Length == 0 || ((e.Button & MouseButtons.Left)!= MouseButtons.Left) ) return;
-			using (var inv = _matWorkPbox.Clone())
-			{
-				inv.Invert();
-				var pv = new PointF[] { new PointF(e.X, e.Y) };
-				inv.TransformPoints(pv);
-				var dis = pv[0].X;
-				var idx = (int)(pv[0].X / _distDatas * _colorDatas.Length);
-				if (_lastDist != null && _lastDist.Value == dis) { return; }
-				if (dis >= 0 && dis < _distDatas && idx< _colorDatas.Length)
-				{
-					if (_onClickAction != null) _onClickAction(dis);
-					labelIdxColInf.Text = $"Idx={idx},  {ColorInfo(_colorDatas[idx])}";
-					_lastDist = dis;
-					DrawAllGraph();
-					Refresh();
-				}
-			}
+			SetProfileCursorFromMouse(e, false);
 		}
 
 
@@ -601,8 +851,41 @@ namespace ColorImageViewProject
 			// 左ボタンが押されているときには、クリック(MouseDown)が連続したものとして処理する。
 			if ((e.Button & MouseButtons.Left)== MouseButtons.Left)
 			{
-				pboxGraph_MouseDown(sender, e);
+				SetProfileCursorFromMouse(e, true);
 			}
+		}
+
+
+		/// <summary>
+		/// マウス位置からプロファイルカーソルと2点測定位置を更新します</summary>
+		/// <param name="e">マウスイベント情報</param>
+		/// <param name="isDrag">ドラッグ更新の場合true</param>
+		private void SetProfileCursorFromMouse(MouseEventArgs e, bool isDrag)
+		{
+			if (_colorDatas == null || _colorDatas.Length == 0 || ((e.Button & MouseButtons.Left) != MouseButtons.Left)) return;
+			if (TryGetProfilePosition(e.X, e.Y, out var dist, out var idx) == false) return;
+			if (_lastDist != null && Math.Abs(_lastDist.Value - dist) < 0.000001) return;
+
+			var previousLastDist = _lastDist;
+			UpdateMeasureDistance(dist, isDrag);
+			var measureDistB = _measureDistB;
+			var measureDistE = _measureDistE;
+			_onClickAction?.Invoke(dist);
+			_lastDist = previousLastDist;
+			_measureDistB = measureDistB;
+			_measureDistE = measureDistE;
+			_onMeasureRangeAction?.Invoke(measureDistB, measureDistE);
+			_lastDist = previousLastDist;
+			_measureDistB = measureDistB;
+			_measureDistE = measureDistE;
+			idx = DistanceToIndex(dist);
+			if (idx < 0 || idx >= _colorDatas.Length) return;
+
+			labelIdxColInf.Text = $"Idx={idx},  {ColorInfo(_colorDatas[idx])}";
+			_lastDist = dist;
+			UpdateProfileAnalysisText();
+			DrawAllGraph();
+			Refresh();
 		}
 	}
 }

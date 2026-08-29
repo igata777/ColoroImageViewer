@@ -202,6 +202,7 @@ namespace ColorImageViewProject
 				return;
 			}
             if (_mainImage== null || _mainImage.Bmap == null) return;
+			if (_pictBox == null || _pictBox.Width <= 0 || _pictBox.Height <= 0) return;
 
 			// 補間モードの設定
 			try
@@ -315,25 +316,29 @@ namespace ColorImageViewProject
 			BitmapData destData = null;
 			try
 			{
-				sourceData = source.LockBits(new Rectangle(0, 0, source.Width, source.Height), ImageLockMode.ReadOnly, source.PixelFormat);
+				if (TryCreateVisibleSourceLockRect(source, dest.Size, elm, out var sourceLockRect) == false) return true;
+
+				sourceData = source.LockBits(sourceLockRect, ImageLockMode.ReadOnly, source.PixelFormat);
 				destData = dest.LockBits(new Rectangle(0, 0, dest.Width, dest.Height), ImageLockMode.ReadWrite, dest.PixelFormat);
 
 				var sourceBase = (byte*)sourceData.Scan0;
 				var destBase = (byte*)destData.Scan0;
 				var sourceStride = sourceData.Stride;
 				var destStride = destData.Stride;
+				var sourceXMap = CreateNearestSourceIndexMap(dest.Width, sourceLockRect.Left, sourceLockRect.Right, scaleX, transX);
+				var sourceYMap = CreateNearestSourceIndexMap(dest.Height, sourceLockRect.Top, sourceLockRect.Bottom, scaleY, transY);
 
 				for (var y = 0; y < dest.Height; y++)
 				{
-					var sourceY = (int)Math.Floor((y - transY) / scaleY);
-					if (sourceY < 0 || sourceY >= source.Height) continue;
+					var sourceY = sourceYMap[y];
+					if (sourceY < 0) continue;
 
-					var sourceRow = GetBitmapRowPointer(sourceBase, sourceStride, source.Height, sourceY);
+					var sourceRow = GetBitmapRowPointer(sourceBase, sourceStride, sourceLockRect.Height, sourceY);
 					var destRow = GetBitmapRowPointer(destBase, destStride, dest.Height, y);
 					for (var x = 0; x < dest.Width; x++)
 					{
-						var sourceX = (int)Math.Floor((x - transX) / scaleX);
-						if (sourceX < 0 || sourceX >= source.Width) continue;
+						var sourceX = sourceXMap[x];
+						if (sourceX < 0) continue;
 
 						var sourcePixel = sourceRow + sourceX * 3;
 						var destPixel = destRow + x * destBpp;
@@ -354,6 +359,58 @@ namespace ColorImageViewProject
 				if (destData != null) dest.UnlockBits(destData);
 				if (sourceData != null) source.UnlockBits(sourceData);
 			}
+		}
+
+
+		/// <summary>
+		/// 最近傍描画用の元画像座標対応表を作成します</summary>
+		/// <param name="destLength">描画先長さ</param>
+		/// <param name="sourceStart">ロック済み元画像開始座標</param>
+		/// <param name="sourceEnd">ロック済み元画像終了座標</param>
+		/// <param name="scale">表示倍率</param>
+		/// <param name="translate">表示位置</param>
+		/// <returns>描画先座標に対応するロック済み元画像内座標。範囲外は-1</returns>
+		private static int[] CreateNearestSourceIndexMap(int destLength, int sourceStart, int sourceEnd, float scale, float translate)
+		{
+			var map = new int[destLength];
+			var sourcePosition = (0.0f - translate) / scale;
+			var sourcePositionStep = 1.0f / scale;
+			for (var i = 0; i < destLength; i++)
+			{
+				var sourceIndex = (int)Math.Floor(sourcePosition);
+				map[i] = sourceIndex >= sourceStart && sourceIndex < sourceEnd ? sourceIndex - sourceStart : -1;
+				sourcePosition += sourcePositionStep;
+			}
+			return map;
+		}
+
+
+		/// <summary>
+		/// 表示に必要な元画像ロック矩形を作成します</summary>
+		/// <param name="source">表示対象画像</param>
+		/// <param name="destSize">描画先サイズ</param>
+		/// <param name="elm">表示マトリックス要素</param>
+		/// <param name="sourceLockRect">元画像ロック矩形</param>
+		/// <returns>描画対象がある場合、true</returns>
+		private static bool TryCreateVisibleSourceLockRect(Bitmap source, Size destSize, float[] elm, out Rectangle sourceLockRect)
+		{
+			sourceLockRect = Rectangle.Empty;
+			if (source == null || destSize.Width <= 0 || destSize.Height <= 0) return false;
+
+			var scaleX = elm[0];
+			var scaleY = elm[3];
+			var transX = elm[4];
+			var transY = elm[5];
+			if (scaleX <= 0.0f || scaleY <= 0.0f) return false;
+
+			var left = Math.Max(0, (int)Math.Floor((0.0f - transX) / scaleX) - 1);
+			var top = Math.Max(0, (int)Math.Floor((0.0f - transY) / scaleY) - 1);
+			var right = Math.Min(source.Width, (int)Math.Ceiling((destSize.Width - transX) / scaleX) + 1);
+			var bottom = Math.Min(source.Height, (int)Math.Ceiling((destSize.Height - transY) / scaleY) + 1);
+			if (right <= left || bottom <= top) return false;
+
+			sourceLockRect = Rectangle.FromLTRB(left, top, right, bottom);
+			return true;
 		}
 
 
@@ -383,6 +440,12 @@ namespace ColorImageViewProject
 			sourceRect = RectangleF.Empty;
 			destRect = RectangleF.Empty;
 			if (bmp == null || mat == null || drawSize.Width <= 0 || drawSize.Height <= 0) return false;
+
+			var elm = mat.Elements;
+			if (Math.Abs(elm[1]) <= 0.0001f && Math.Abs(elm[2]) <= 0.0001f && elm[0] > 0.0f && elm[3] > 0.0f)
+			{
+				return TryCreateVisibleDrawRectNoShear(bmp, drawSize, elm, out sourceRect, out destRect);
+			}
 
 			using (var invertedMat = (Matrix)mat.Clone())
 			{
@@ -418,6 +481,36 @@ namespace ColorImageViewProject
 			mat.TransformPoints(sourcePoints);
 			destRect = CreateBounds(sourcePoints);
 
+			return destRect.Width > 0.0f && destRect.Height > 0.0f;
+		}
+
+
+		/// <summary>
+		/// 回転なし表示に必要な元画像矩形と描画先矩形を作成します</summary>
+		/// <param name="bmp">表示対象画像</param>
+		/// <param name="drawSize">描画先サイズ</param>
+		/// <param name="elm">表示マトリックス要素</param>
+		/// <param name="sourceRect">元画像矩形</param>
+		/// <param name="destRect">描画先矩形</param>
+		/// <returns>描画対象がある場合、true</returns>
+		private static bool TryCreateVisibleDrawRectNoShear(Bitmap bmp, Size drawSize, float[] elm, out RectangleF sourceRect, out RectangleF destRect)
+		{
+			sourceRect = RectangleF.Empty;
+			destRect = RectangleF.Empty;
+
+			var scaleX = elm[0];
+			var scaleY = elm[3];
+			var transX = elm[4];
+			var transY = elm[5];
+
+			var left = Math.Max(0.0f, (float)Math.Floor((0.0f - transX) / scaleX) - 1.0f);
+			var top = Math.Max(0.0f, (float)Math.Floor((0.0f - transY) / scaleY) - 1.0f);
+			var right = Math.Min((float)bmp.Width, (float)Math.Ceiling((drawSize.Width - transX) / scaleX) + 1.0f);
+			var bottom = Math.Min((float)bmp.Height, (float)Math.Ceiling((drawSize.Height - transY) / scaleY) + 1.0f);
+			if (right <= left || bottom <= top) return false;
+
+			sourceRect = RectangleF.FromLTRB(left, top, right, bottom);
+			destRect = RectangleF.FromLTRB(left * scaleX + transX, top * scaleY + transY, right * scaleX + transX, bottom * scaleY + transY);
 			return destRect.Width > 0.0f && destRect.Height > 0.0f;
 		}
 
@@ -560,7 +653,8 @@ namespace ColorImageViewProject
 		public void SetMainMatrixRate(float rate)
         {
 			if (_isNoImageMode) return;
-			var w = new Matrix(rate, _mainImage.Mat.Elements[1], _mainImage.Mat.Elements[2], rate, _mainImage.Mat.Elements[4], _mainImage.Mat.Elements[5]);
+			var adjustedRate = _mainImage.ClampScaleRate(rate);
+			var w = new Matrix(adjustedRate, _mainImage.Mat.Elements[1], _mainImage.Mat.Elements[2], adjustedRate, _mainImage.Mat.Elements[4], _mainImage.Mat.Elements[5]);
 			_mainImage.Mat = w;
 			// 描画領域の通知
 			NoticeDispRect();
@@ -670,7 +764,8 @@ namespace ColorImageViewProject
 			if (IsFixed == false || IsPowerFlag == true)	// 画面サイズFixモードでなければ、Matrixを画面フィット状態に調整する
 			{
 				_mainImage.Mat.Reset();
-				float rate = CalZoomScale(_pictBox, _mainImage.Bmap, isFitWidth);
+				var rate = CalZoomScale(_pictBox, _mainImage.Bmap, isFitWidth);
+				rate = _mainImage.ClampScaleRate(rate);
 				_mainImage.Mat.Scale(rate, rate);
 				// 画像の描画 
 				ChangedMainImageMatrix();
@@ -1383,6 +1478,39 @@ namespace ColorImageViewProject
 		public ScalablePboxMainImage(PictureBox pbox)
 		{
             _pbox = pbox;
+			MaxRate = (float)_maxRateMainImage;
+			MinRate = (float)_minRateMainImage;
+		}
+
+
+		/// <summary>
+		/// 表示倍率を有効範囲に丸めます</summary>
+		/// <param name="rate">表示倍率</param>
+		/// <returns>有効範囲に丸めた表示倍率</returns>
+		public float ClampScaleRate(float rate)
+		{
+			if (Single.IsNaN(rate) || Single.IsInfinity(rate) || rate <= 0.0f) return GetEffectiveMinRate();
+
+			var maxRate = MaxRate > 0.0f ? MaxRate : rate;
+			var minRate = GetEffectiveMinRate();
+			if (maxRate < minRate) maxRate = minRate;
+			if (rate > maxRate) return maxRate;
+			if (rate < minRate) return minRate;
+			return rate;
+		}
+
+
+		/// <summary>
+		/// 現在の画像と表示領域に応じた実効最小倍率を取得します</summary>
+		/// <returns>実効最小倍率</returns>
+		private float GetEffectiveMinRate()
+		{
+			var minRate = MinRate > 0.0f ? MinRate : 0.000001f;
+			if (_bmap == null || _pbox == null || _pbox.Width <= 0 || _pbox.Height <= 0) return minRate;
+
+			var fitRate = ScalablePbox.CalZoomScale(_pbox, _bmap);
+			if (Single.IsNaN(fitRate) || Single.IsInfinity(fitRate) || fitRate <= 0.0f) return minRate;
+			return Math.Min(minRate, fitRate);
 		}
 
 
@@ -1390,17 +1518,10 @@ namespace ColorImageViewProject
 		/// <param name="resr">予想最終倍率</param>
 		protected void AdjustScaleRate(float resr)
 		{
-			// 最大値を超えていたら、最大値になるようratedifをセットします
-			if (resr > MaxRate)
-			{
-				resr = MaxRate;
-			}
-			// 最小値未満であれば、最小値になるようratedifをセットします
-			if (resr < MinRate)
-			{
-				resr = MinRate;
-			}
-			float rate = resr / _mat.Elements[0];
+			resr = ClampScaleRate(resr);
+			var currentRate = _mat.Elements[0];
+			if (Single.IsNaN(currentRate) || Single.IsInfinity(currentRate) || currentRate <= 0.0f) currentRate = 1.0f;
+			var rate = resr / currentRate;
 			_mat.Scale(rate, rate, System.Drawing.Drawing2D.MatrixOrder.Append);
 		}
 
@@ -1542,6 +1663,7 @@ namespace ColorImageViewProject
 		/// <remarks>倍率は現在の倍率</remarks>
 		public void MoveDispPos(float x, float y, float xx, float yy, float rate)
 		{
+			rate = ClampScaleRate(rate);
 			_mat.Reset();
 			_mat.Translate(-x, -y, MatrixOrder.Append);
 			_mat.Scale(rate, rate, MatrixOrder.Append);         // 縦横同比率が前提

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="300" viewBox="0 0 920 300" role="img" aria-labelledby="title desc">
+  <title id="title">巨大画像表示の考え方</title>
+  <desc id="desc">巨大画像では画面に必要な範囲だけを描画し、倍率下限を画像サイズに応じて調整する模式図</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#3b5b7a"/>
+    </marker>
+    <style>
+      .label { font: 18px sans-serif; fill: #25313b; }
+      .small { font: 14px sans-serif; fill: #425466; }
+      .tiny { font: 12px sans-serif; fill: #5f6f7d; }
+      .flow { stroke: #3b5b7a; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="920" height="300" fill="#ffffff"/>
+  <text x="36" y="38" class="label">大きな画像の表示</text>
+  <text x="36" y="63" class="small">表示に必要な範囲を優先して描画し、全体表示できるように倍率下限を調整します。</text>
+
+  <rect x="60" y="105" width="360" height="120" fill="#eef2f6" stroke="#778899" stroke-width="2"/>
+  <text x="75" y="98" class="tiny">巨大な元画像</text>
+  <g opacity="0.55">
+    <rect x="75" y="122" width="45" height="30" fill="#accce8"/>
+    <rect x="130" y="122" width="60" height="30" fill="#d9c49d"/>
+    <rect x="200" y="122" width="85" height="30" fill="#aac7a5"/>
+    <rect x="295" y="122" width="95" height="30" fill="#d4b2a7"/>
+    <rect x="75" y="165" width="115" height="42" fill="#d7e2ef"/>
+    <rect x="205" y="165" width="80" height="42" fill="#eee0b8"/>
+    <rect x="300" y="165" width="90" height="42" fill="#c8dbbe"/>
+  </g>
+  <rect x="240" y="135" width="115" height="62" fill="none" stroke="#ff8a00" stroke-width="4"/>
+  <text x="245" y="218" class="tiny">表示対象範囲</text>
+
+  <path d="M 445 165 C 500 165, 520 165, 565 165" class="flow"/>
+
+  <rect x="590" y="95" width="250" height="150" fill="#f7fbff" stroke="#8fb5d6" stroke-width="2" rx="8"/>
+  <rect x="620" y="125" width="190" height="88" fill="#ffffff" stroke="#778899"/>
+  <rect x="640" y="142" width="55" height="28" fill="#eee0b8"/>
+  <rect x="706" y="142" width="70" height="28" fill="#c8dbbe"/>
+  <rect x="640" y="180" width="136" height="18" fill="#d4b2a7"/>
+  <text x="612" y="267" class="small">画面に見える範囲を描画</text>
+  <text x="58" y="265" class="tiny">極端な拡大縮小でも、GDI+に過大な描画矩形を渡さない経路へ切り替えます。</text>
+</svg>
