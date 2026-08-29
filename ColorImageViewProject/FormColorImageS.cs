@@ -69,6 +69,9 @@ namespace ColorImageViewProject
 		/// <summary>ドラッグドロップ画像を読み込み中かどうかを保持します</summary>
 		private bool _isOpeningDroppedImages;
 
+		/// <summary>平均色画像表示メニューを保持します</summary>
+		private ToolStripMenuItem _averageColorImageToolStripMenuItem;
+
 		/// <summary>キー入力待ちするか否かの情報を保持します</summary>
 		private bool _isHitAnyKey;
 		/// <summary>設定情報を保持します</summary>
@@ -110,6 +113,9 @@ namespace ColorImageViewProject
 		/// <summary>プロファイルモード（null:なし、true:ラインモード、 false:ボックスモード）を保持します</summary>
 		private bool? _isProfModeLine;
 
+		/// <summary>プロファイルモード切替時に指定範囲を保持するかどうかを保持します</summary>
+		private bool _isKeepProfileRangeOnModeChange;
+
 		/// <summary>プロファイル範囲移動モードフラグです。　全体を移動：true, Bgn側のみ移動:false, 移動モードでない場合nullを示すフラグ</summary>
 		/// <remarks>PointEを移動するのは通常のMeasureModeで対応するため、本フラグはnullの状態とする</remarks>
 		private bool? _isProfPosMovAll;
@@ -119,6 +125,15 @@ namespace ColorImageViewProject
 		private Point _profPosMovOrgPosB;
 		/// <summary>_isProPosMoveAllがnullでなくなったときの終点位置を保存します（_isProfPosMoveAllがnullの場合には無効）</summary>
 		private Point _profPosMovOrgPosE;
+
+		/// <summary>プロファイル更新を最後に行った時刻を保持します</summary>
+		private DateTime _lastProfileUpdateTime = DateTime.MinValue;
+
+		/// <summary>プロファイル更新を保留しているかどうかを保持します</summary>
+		private bool _isProfileUpdateDeferred;
+
+		/// <summary>ドラッグ中のプロファイル更新間隔をミリ秒で保持します</summary>
+		private const int ProfileDragUpdateIntervalMilliseconds = 100;
 
 
 
@@ -179,6 +194,8 @@ namespace ColorImageViewProject
 		{
 			InitializeComponent();
 			InitializeClipboardImageOpenMenuItem();
+			InitializeAverageColorImageMenuItem();
+			FormClosing += FormColorImageS_FormClosing;
 
 			_debLabelPos = new Point(this.Width - labelDispInfo.Location.X, this.Height - labelDispInfo.Location.Y);
 			
@@ -533,6 +550,16 @@ namespace ColorImageViewProject
 
 
 		/// <summary>
+		/// 平均色画像表示メニュー項目を追加します</summary>
+		private void InitializeAverageColorImageMenuItem()
+		{
+			_averageColorImageToolStripMenuItem = new ToolStripMenuItem("平均色画像を表示(&A)");
+			_averageColorImageToolStripMenuItem.Click += 平均色画像を表示ToolStripMenuItem_Click;
+			contextMenuStripProfData.Items.Add(_averageColorImageToolStripMenuItem);
+		}
+
+
+		/// <summary>
 		/// クリップボード画像を新しいビューで開きます</summary>
 		/// <param name="sender">送信元情報</param>
 		/// <param name="e">イベント情報</param>
@@ -540,6 +567,33 @@ namespace ColorImageViewProject
 		private void クリップボード画像を新しいビューで開くToolStripMenuItem_Click(object sender, EventArgs e)
 		{
 			OpenClipboardImage(this, this.Icon, _actOnClosed, _actOnOpened);
+		}
+
+
+		/// <summary>
+		/// 平均色画像を新しいビューで開きます</summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		[SupportedOSPlatform("windows")]
+		private void 平均色画像を表示ToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			Bitmap bmp = null;
+			try
+			{
+				if (TryCreateAverageColorImage(out bmp, out var title) == false) return;
+
+				var frm = new FormColorImageS(bmp, title, false, -1, -1, null, _settings, this.Icon, _actOnClosed, null, true, true, _actOnOpened);
+				bmp = null;
+				ShowLinkedImageForm(frm);
+			}
+			catch (Exception ex)
+			{
+				MessageBox.Show(String.Format("平均色画像表示で例外発生 Message={0}, Stack={1}", ex.Message, ex.StackTrace), "例外", MessageBoxButtons.OK, MessageBoxIcon.Error);
+			}
+			finally
+			{
+				bmp?.Dispose();
+			}
 		}
 
 
@@ -639,7 +693,7 @@ namespace ColorImageViewProject
 			// 関係するモードでなければ、リターンするコードを追加予定
 
 			// 表示条件に合わない場合、何もしない
-			if ((x < 0 || y < 0) || _sourceImage == null)
+			if (IsPointInSourceImage(x, y) == false)
 			{
 				return false;
 			}
@@ -647,12 +701,19 @@ namespace ColorImageViewProject
 			// ボタンが上がった時のイベントおよび左クリック以外は無視
 			if (down == false || isLeft == false)
 			{
+				var needsProfileUpdate = down == false && (_isMeasureMode || _isProfPosMovAll != null || _isProfileUpdateDeferred);
 				if (_isProfPosMovAll != null)
 				{
 					_isProfPosMovAll = null;
 					_isMeasureMode = false;
 				}
-				return false;
+				if (down == false)
+				{
+					_isMeasureMode = false;
+					_isProfileUpdateDeferred = false;
+					_lastProfileUpdateTime = DateTime.MinValue;
+				}
+				return needsProfileUpdate;
 			}
 
 			// 非プロファイルモードで Ctrl+クリック（コントロールキーが押されているかつダウン）時の振る舞い→ラインモードにする
@@ -779,7 +840,7 @@ namespace ColorImageViewProject
 				   return false;
 			   }
 			   // 表示条件に合わない場合、何もしない
-			   if ((x < 0 || y < 0) || _sourceImage == null)
+			   if (IsPointInSourceImage(x, y) == false)
 			   {
 				   return false;
 			   }
@@ -813,7 +874,7 @@ namespace ColorImageViewProject
 					var posB = new Point( _profPosMovOrgPosB.X + ofsX, _profPosMovOrgPosB.Y + ofsY );
 					var posE = new Point(_profPosMovOrgPosE.X + ofsX, _profPosMovOrgPosE.Y + ofsY);
 
-					if (Math.Min(posB.X, posE.X) >= 0 && Math.Max(posB.X, posE.X) <= _scalePbox.MainImageWidth && Math.Min(posB.Y, posE.Y) >= 0 && Math.Max(posB.Y, posE.Y) <= _scalePbox.MainImageHeight)
+					if (IsPointInSourceImage(posB) && IsPointInSourceImage(posE))
 					{
 						_measureModePointB = posB;
 						_measureModePointE = posE;
@@ -830,7 +891,7 @@ namespace ColorImageViewProject
 						else ofsY = 0;
 					}
 					var posB = new Point(_profPosMovOrgPosB.X + ofsX, _profPosMovOrgPosB.Y + ofsY);
-					if( posB.X>= 0 && posB.X < _scalePbox.MainImageWidth )	_measureModePointB = posB;
+					if (IsPointInSourceImage(posB)) _measureModePointB = posB;
 				}
 
 			}
@@ -848,6 +909,50 @@ namespace ColorImageViewProject
 		private int RgbToGray(int rr, int gg, int bb)
 		{
 			return (int)(rr * 0.299 + gg * 0.587 + bb * 0.114);
+		}
+
+
+		/// <summary>
+		/// 指定座標が元画像内かどうかを取得します</summary>
+		/// <param name="x">X座標</param>
+		/// <param name="y">Y座標</param>
+		/// <returns>画像内の場合true</returns>
+		private bool IsPointInSourceImage(int x, int y)
+		{
+			return IsPointInBitmap(_sourceImage, x, y);
+		}
+
+
+		/// <summary>
+		/// 指定座標が元画像内かどうかを取得します</summary>
+		/// <param name="point">座標</param>
+		/// <returns>画像内の場合true</returns>
+		private bool IsPointInSourceImage(Point point)
+		{
+			return IsPointInSourceImage(point.X, point.Y);
+		}
+
+
+		/// <summary>
+		/// 指定座標がビットマップ内かどうかを取得します</summary>
+		/// <param name="bmp">ビットマップ</param>
+		/// <param name="x">X座標</param>
+		/// <param name="y">Y座標</param>
+		/// <returns>ビットマップ内の場合true</returns>
+		private bool IsPointInBitmap(Bitmap bmp, int x, int y)
+		{
+			return bmp != null && x >= 0 && x < bmp.Width && y >= 0 && y < bmp.Height;
+		}
+
+
+		/// <summary>
+		/// 指定矩形がビットマップ内かどうかを取得します</summary>
+		/// <param name="bmp">ビットマップ</param>
+		/// <param name="rect">矩形</param>
+		/// <returns>ビットマップ内の場合true</returns>
+		private bool IsRectInBitmap(Bitmap bmp, Rectangle rect)
+		{
+			return bmp != null && rect.Width > 0 && rect.Height > 0 && rect.Left >= 0 && rect.Top >= 0 && rect.Right <= bmp.Width && rect.Bottom <= bmp.Height;
 		}
 
 
@@ -1367,28 +1472,69 @@ namespace ColorImageViewProject
 		}
 
 
+		/// <summary>
+		/// フォームを閉じる前の処理です</summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void FormColorImageS_FormClosing(object sender, FormClosingEventArgs e)
+		{
+			try
+			{
+				DeleteProfileForm();
+			}
+			catch
+			{
+				// 終了操作を優先する。
+			}
+		}
+
+
 		/// <summary>クローズ時の処理です</summary>
 		/// <param name="sender">送信元情報</param>
 		/// <param name="e">イベント情報</param>
 		[SupportedOSPlatform("windows")]
 		private void FormColorImageS_FormClosed(object sender, FormClosedEventArgs e)
 		{
-			DeleteProfileForm();
-
-			if (_scalePbox != null)
+			try
 			{
-				_scalePbox.Dispose();
+				DeleteProfileForm();
+			}
+			catch
+			{
+			}
+
+			try
+			{
+				_scalePbox?.Dispose();
+			}
+			catch
+			{
+			}
+			finally
+			{
 				_scalePbox = null;
 			}
 
-			if (_sourceImage != null)
+			try
 			{
-				_sourceImage.Dispose();
+				_sourceImage?.Dispose();
+			}
+			catch
+			{
+			}
+			finally
+			{
 				_sourceImage = null;
 			}
 
 			// 終了時アクションが指定されていれば呼び出す。
-			if (_actOnClosed != null) _actOnClosed();
+			try
+			{
+				_actOnClosed?.Invoke();
+			}
+			catch
+			{
+			}
 		}
 
 		/// <summary>「Fit」が指定されたときの処理です</summary>
@@ -1654,7 +1800,44 @@ namespace ColorImageViewProject
 			DispMeasureMode(gra);
 
 			// プロファイルフォーム生成・描画
-			CreateProfileForm(false);  
+			if (ShouldUpdateProfileFormOnPaint())
+			{
+				CreateProfileForm(false);
+			}
+		}
+
+
+		/// <summary>
+		/// 描画時にプロファイルフォームを更新するかどうかを取得します</summary>
+		/// <returns>更新する場合true</returns>
+		private bool ShouldUpdateProfileFormOnPaint()
+		{
+			if (IsProfileDragUpdateThrottleTarget() == false)
+			{
+				_isProfileUpdateDeferred = false;
+				_lastProfileUpdateTime = DateTime.MinValue;
+				return true;
+			}
+
+			var now = DateTime.UtcNow;
+			if ((now - _lastProfileUpdateTime).TotalMilliseconds >= ProfileDragUpdateIntervalMilliseconds)
+			{
+				_lastProfileUpdateTime = now;
+				_isProfileUpdateDeferred = false;
+				return true;
+			}
+
+			_isProfileUpdateDeferred = true;
+			return false;
+		}
+
+
+		/// <summary>
+		/// ドラッグ中のプロファイル更新間引き対象かどうかを取得します</summary>
+		/// <returns>間引き対象の場合true</returns>
+		private bool IsProfileDragUpdateThrottleTarget()
+		{
+			return _isMeasureMode && _isProfModeLine == false && _measureModePointB != null && _measureModePointE != null;
 		}
 
 
@@ -1670,8 +1853,8 @@ namespace ColorImageViewProject
 				// 十字カーソルのサイズは固定で10pixel（表示座標上）
 				var dR = (float)_scalePbox.DispRate;
 				var sizeCursol = (float)24.0 / dR;	// (float)Math.Ceiling(20.0 / dR);
-				var widLine = (float)3.0 / dR;		// (float)Math.Ceiling( 2.0 / dR);
-				var widCursor = (float)2.0 / dR;	// (float)Math.Ceiling( 1.0 / dR);
+				var widLine = _settings.ProfileSelectionLineWidth / dR;		// (float)Math.Ceiling( 2.0 / dR);
+				var widCursor = _settings.ProfilePointCursorLineWidth / dR;	// (float)Math.Ceiling( 1.0 / dR);
 				var pcSize = (float)4.0 / dR;		// (float)Math.Ceiling( 4.0 / dR);   
 
 
@@ -1683,7 +1866,7 @@ namespace ColorImageViewProject
 					var poBv = (Point)_measureModePointB.Value;
 					if (_measureModePointE == null)
 					{
-						CrossCursor(g, (Point)_measureModePointB.Value, sizeCursol, Color.Red, widCursor);
+						CrossCursor(g, (Point)_measureModePointB.Value, sizeCursol, _settings.ProfileStartCursorColor, widCursor);
 						tboxProfInfo.Text = String.Format("({0,4},{1,4} ) - ", _measureModePointB.Value.X, _measureModePointB.Value.Y);
 					}
 					else
@@ -1691,9 +1874,9 @@ namespace ColorImageViewProject
 						var pB = _measureModePointB.Value;
 						var pE = _measureModePointE.Value;
 						var poEv = new Point[] { _measureModePointE.Value };
-						DispMeasureCursor(g, pB, pE, Color.Yellow, widLine, pcSize, _isProfModeLine.Value);
-						CrossCursor(g, pB, sizeCursol, Color.Red, widCursor);
-						CrossCursor(g, pE, sizeCursol, Color.GreenYellow, widCursor);
+						DispMeasureCursor(g, pB, pE, _settings.ProfileSelectionLineColor, widLine, pcSize, _isProfModeLine.Value, _settings.ProfileGuideCursorColor);
+						CrossCursor(g, pB, sizeCursol, _settings.ProfileStartCursorColor, widCursor);
+						CrossCursor(g, pE, sizeCursol, _settings.ProfileEndCursorColor, widCursor);
 						tboxProfInfo.Text = String.Format("({0,4},{1,4} ) - ({2,4},{3,4} ) ", pB.X, pB.Y, pE.X, pE.Y);
 						// ラインの場合には2点の距離を、ボックス時は2点の差分を表示する
 						labelProfSize.Text = _isProfModeLine.Value == true ? String.Format("{0:#0.00}", UtilityGraphics.CalcDistance(pB, pE)) : String.Format("({0}, {1})", pE.X - pB.X, pE.Y - pB.Y);
@@ -1762,8 +1945,9 @@ namespace ColorImageViewProject
 		/// <param name="wid">線の幅</param>
 		/// <param name="pcSiz">ポイントカーソルサイズ</param>
 		/// <param name="isLine">true:ライン false:ボックス</param>
+		/// <param name="guideColor">補助カーソル色</param>
 		[SupportedOSPlatform("windows")]
-		private void DispMeasureCursor(Graphics g, Point pob, Point poe, Color col, float wid, float pcSiz, bool isLine)
+		private void DispMeasureCursor(Graphics g, Point pob, Point poe, Color col, float wid, float pcSiz, bool isLine, Color guideColor)
 		{
 			using (var pen = new Pen(col, wid))
 			{
@@ -1773,19 +1957,19 @@ namespace ColorImageViewProject
 				if (isLine)
 				{
 					g.DrawLine(pen, pob, poe);
-					using (var penC = new Pen(Color.Orange, wid))
+					using (var penC = new Pen(guideColor, wid))
 					{
 						DrawLineProfileRangeCursors(g, pob, poe, penC, pcSiz);
 					}
 
 					if (_pcLine != null)
 					{
-						DrawLineProfilePointCursor(g, pob, poe, _pcLine.Value, pcSiz);
+						DrawLineProfilePointCursor(g, pob, poe, _pcLine.Value, pcSiz, guideColor);
 					}
 				}
 				else
 				{
-					using (var penC = new Pen(Color.Orange, wid))
+					using (var penC = new Pen(guideColor, wid))
 					{
 						var rect = CreateFRectFromMeasurePoint(pob, poe); // 描画用
 						g.DrawRectangle(pen, rect);
@@ -1842,11 +2026,15 @@ namespace ColorImageViewProject
 		/// <param name="poe">終了位置</param>
 		/// <param name="dist">開始位置からの距離</param>
 		/// <param name="pcSiz">ポイントカーソルサイズ</param>
-		private void DrawLineProfilePointCursor(Graphics g, Point pob, Point poe, double dist, float pcSiz)
+		/// <param name="color">描画色</param>
+		private void DrawLineProfilePointCursor(Graphics g, Point pob, Point poe, double dist, float pcSiz, Color color)
 		{
 			if (TryGetLineProfileUnitVector(pob, poe, out var xx, out var yy) == false) return;
 			var rr = new RectangleF(pob.X + (float)(xx * dist) - pcSiz, pob.Y + (float)(yy * dist) - pcSiz, pcSiz * 2, pcSiz * 2);
-			g.FillRectangle(Brushes.Orange, rr);
+			using (var brush = new SolidBrush(color))
+			{
+				g.FillRectangle(brush, rr);
+			}
 		}
 
 
@@ -1926,12 +2114,19 @@ namespace ColorImageViewProject
 			var rbtn = sender as RadioButton;
 			if (rbtn == null|| rbtn.Checked== false ) return;
 
-			var oldProfMode = _isProfModeLine;
 			SetProfileMode();
 
-			// 計測モード、PointB,Eをクリアし、プロファイル用フォームが開いていれば破棄する
-			ClearMeasureMode();
-			DeleteProfileForm();
+			if (_isKeepProfileRangeOnModeChange == false)
+			{
+				// 計測モード、PointB,Eをクリアし、プロファイル用フォームが開いていれば破棄する
+				ClearMeasureMode();
+			}
+			else
+			{
+				_isMeasureMode = false;
+				_isProfPosMovAll = null;
+				DeleteProfileForm();
+			}
 
 			if (_isProfModeLine == null)
 			{
@@ -1958,6 +2153,59 @@ namespace ColorImageViewProject
 
 
 		/// <summary>
+		/// 指定済みのプロファイル範囲を維持してLine/Boxを切り替えます</summary>
+		/// <returns>切り替えた場合true</returns>
+		[SupportedOSPlatform("windows")]
+		private bool ToggleProfileMode()
+		{
+			if (IsProfileModeToggleKeyTarget() == false) return false;
+
+			var pB = _measureModePointB.Value;
+			var pE = _measureModePointE.Value;
+			if (pB.X == pE.X || pB.Y == pE.Y) return false;
+
+			try
+			{
+				_isKeepProfileRangeOnModeChange = true;
+				if (_isProfModeLine.Value)
+				{
+					rbtnProfModeBox.Checked = true;
+				}
+				else
+				{
+					rbtnProfModeLine.Checked = true;
+				}
+			}
+			finally
+			{
+				_isKeepProfileRangeOnModeChange = false;
+			}
+
+			_scalePbox.DrawMainImage();
+			Refresh();
+			return true;
+		}
+
+
+		/// <summary>
+		/// プロファイルモード切替キーの対象状態かどうかを取得します</summary>
+		/// <returns>対象状態の場合true</returns>
+		private bool IsProfileModeToggleKeyTarget()
+		{
+			return IsProfileRangeSpecified();
+		}
+
+
+		/// <summary>
+		/// プロファイル範囲が指定済みかどうかを取得します</summary>
+		/// <returns>指定済みの場合true</returns>
+		private bool IsProfileRangeSpecified()
+		{
+			return _sourceImage != null && _isProfModeLine != null && _measureModePointB != null && _measureModePointE != null;
+		}
+
+
+		/// <summary>
 		/// MesureMode（ProfMode時のCtrl状態）をクリアします</summary>
 		private void ClearMeasureMode()
 		{
@@ -1966,6 +2214,8 @@ namespace ColorImageViewProject
 			_measureModePointB = _measureModePointE = null;
 
 			_isProfPosMovAll = null;
+			_isProfileUpdateDeferred = false;
+			_lastProfileUpdateTime = DateTime.MinValue;
 
 			DeleteProfileForm();
 		}
@@ -2081,9 +2331,9 @@ namespace ColorImageViewProject
 		/// <returns>平均色</returns>
 		private Color AverageColor(Color[] cols)
 		{
-			int tR = 0;
-			int tG = 0;
-			int tB = 0;
+			long tR = 0;
+			long tG = 0;
+			long tB = 0;
 			foreach (var c in cols)
 			{
 				tR += c.R;
@@ -2100,8 +2350,127 @@ namespace ColorImageViewProject
 		private string AverageColorString(Color[] cols)
 		{
 			var c = AverageColor(cols);
-			return $"[{c.R.ToString().PadLeft(3)},{c.G.ToString().PadLeft(3)},{c.B.ToString().PadLeft(3)}]";
+			return RgbColorString(c);
 		}
+
+
+		/// <summary>
+		/// RGBを示す文字列に変換します</summary>
+		/// <param name="col">色情報</param>
+		/// <returns>RGB文字列</returns>
+		private string RgbColorString(Color col)
+		{
+			return $"[{col.R.ToString().PadLeft(3)},{col.G.ToString().PadLeft(3)},{col.B.ToString().PadLeft(3)}]";
+		}
+
+
+		/// <summary>
+		/// プロファイル範囲の平均色で塗りつぶした画像を生成します</summary>
+		/// <param name="bmp">生成したビットマップ</param>
+		/// <param name="title">表示タイトル</param>
+		/// <returns>生成できた場合true</returns>
+		[SupportedOSPlatform("windows")]
+		private bool TryCreateAverageColorImage(out Bitmap bmp, out string title)
+		{
+			bmp = null;
+			title = "";
+			if (TryCalculateCurrentProfileAverageColor(out var avgColor, out var rect) == false) return false;
+
+			bmp = new Bitmap(rect.Width, rect.Height, PixelFormat.Format24bppRgb);
+			using (var gra = Graphics.FromImage(bmp))
+			{
+				gra.Clear(avgColor);
+			}
+
+			var modeName = _isProfModeLine == true ? "Line" : "Box";
+			title = $"平均色_{modeName}_{rect.Width}x{rect.Height}_{RgbColorString(avgColor).Replace(' ', '_')}";
+			return true;
+		}
+
+
+		/// <summary>
+		/// 現在のプロファイル範囲の平均色を算出します</summary>
+		/// <param name="avgColor">平均色</param>
+		/// <param name="rect">始点と終点を対角とする矩形</param>
+		/// <returns>算出できた場合true</returns>
+		[SupportedOSPlatform("windows")]
+		private bool TryCalculateCurrentProfileAverageColor(out Color avgColor, out Rectangle rect)
+		{
+			avgColor = Color.Empty;
+			rect = Rectangle.Empty;
+			if (IsProfileRangeSpecified() == false) return false;
+
+			rect = CreateRectFromMeasurePoint(_measureModePointB.Value, _measureModePointE.Value);
+			if (IsRectInBitmap(_sourceImage, rect) == false) return false;
+
+			if (_isProfModeLine == true)
+			{
+				var datas = CalcLineProfile(out _);
+				if (datas == null || datas.Length == 0) return false;
+
+				avgColor = AverageColor(datas);
+				return true;
+			}
+
+			return TryCalculateAverageColorFromRect(_sourceImage, rect, out avgColor);
+		}
+
+
+		/// <summary>
+		/// 指定矩形の平均色を算出します</summary>
+		/// <param name="bmp">ビットマップ</param>
+		/// <param name="rect">対象矩形</param>
+		/// <param name="avgColor">平均色</param>
+		/// <returns>算出できた場合true</returns>
+		[SupportedOSPlatform("windows")]
+		private unsafe bool TryCalculateAverageColorFromRect(Bitmap bmp, Rectangle rect, out Color avgColor)
+		{
+			avgColor = Color.Empty;
+			if (IsRectInBitmap(bmp, rect) == false) return false;
+
+			var bpp = Image.GetPixelFormatSize(bmp.PixelFormat) / 8;
+			if (bpp < 3) return false;
+
+			var sumB = 0L;
+			var sumG = 0L;
+			var sumR = 0L;
+			var count = (long)rect.Width * rect.Height;
+			try
+			{
+				var bmpData = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height), ImageLockMode.ReadOnly, bmp.PixelFormat);
+				try
+				{
+					var bmpScan0 = (byte*)bmpData.Scan0;
+					var bmpStride = bmpData.Stride;
+					for (var yy = 0; yy < rect.Height; yy++)
+					{
+						var sp = bmpScan0 + (yy + rect.Y) * bmpStride + rect.X * bpp;
+						for (var xx = 0; xx < rect.Width; xx++)
+						{
+							sumB += sp[0];
+							sumG += sp[1];
+							sumR += sp[2];
+							sp += bpp;
+						}
+					}
+				}
+				finally
+				{
+					bmp.UnlockBits(bmpData);
+				}
+
+				avgColor = Color.FromArgb(
+					(int)Math.Round((double)sumR / count, MidpointRounding.AwayFromZero),
+					(int)Math.Round((double)sumG / count, MidpointRounding.AwayFromZero),
+					(int)Math.Round((double)sumB / count, MidpointRounding.AwayFromZero));
+				return true;
+			}
+			catch
+			{
+				return false;
+			}
+		}
+
 
 		/// <summary>
 		/// プロファイルモードに従い、プロファイル用フォームを生成します</summary>
@@ -2124,7 +2493,7 @@ namespace ColorImageViewProject
 				var pData = CalcLineProfile( out var distance );
 				if (_formProfViewerLine == null)
 				{
-					_formProfViewerLine = new FormProfileViewer(pData, "ラインプロファイル", null, distance, this.Icon, OnLineProfileCursorChanged, OnLineProfileRangeChanged, OnProfileViewerForegroundModeChanged);
+					_formProfViewerLine = new FormProfileViewer(pData, "ラインプロファイル", null, distance, this.Icon, OnLineProfileCursorChanged, OnLineProfileRangeChanged, OnProfileViewerForegroundModeChanged, () => ToggleProfileMode());
 					ShowProfileViewer(_formProfViewerLine);
 				}
 				else{
@@ -2141,7 +2510,7 @@ namespace ColorImageViewProject
 				var pDataH = CalcBoxHProfile();
 				if (_formProfViewerBoxH == null)
 				{
-					_formProfViewerBoxH = new FormProfileViewer(pDataH, "水平プロファイル", null, 0.0, this.Icon, OnBoxHProfileCursorChanged, OnBoxHProfileRangeChanged, OnProfileViewerForegroundModeChanged);
+					_formProfViewerBoxH = new FormProfileViewer(pDataH, "水平プロファイル", null, 0.0, this.Icon, OnBoxHProfileCursorChanged, OnBoxHProfileRangeChanged, OnProfileViewerForegroundModeChanged, () => ToggleProfileMode());
 					ShowProfileViewer(_formProfViewerBoxH);
 				}
 				else
@@ -2153,7 +2522,7 @@ namespace ColorImageViewProject
 				var pDataV = CalcBoxVProfile();
 				if (_formProfViewerBoxV == null)
 				{
-					_formProfViewerBoxV = new FormProfileViewer(pDataV, "垂直プロファイル", null, 0.0, this.Icon, OnBoxVProfileCursorChanged, OnBoxVProfileRangeChanged, OnProfileViewerForegroundModeChanged);
+					_formProfViewerBoxV = new FormProfileViewer(pDataV, "垂直プロファイル", null, 0.0, this.Icon, OnBoxVProfileCursorChanged, OnBoxVProfileRangeChanged, OnProfileViewerForegroundModeChanged, () => ToggleProfileMode());
 					ShowProfileViewer(_formProfViewerBoxV);
 				}
 				else
@@ -2162,9 +2531,8 @@ namespace ColorImageViewProject
 					if (isForce) ShowProfileViewer(_formProfViewerBoxV);
 				}
 
-				var pData = GetBoxProfile();
 				// データがあれば平均値を表示（なければクリア）
-				labelAverageColor.Text = (pData != null && pData.Any()) ? $"平均色 {AverageColorString(pData)}" : "";
+				labelAverageColor.Text = TryCalculateCurrentProfileAverageColor(out var avgColor, out _) ? $"平均色 {RgbColorString(avgColor)}" : "";
 
 			}
 
@@ -2181,6 +2549,8 @@ namespace ColorImageViewProject
 			var by = _measureModePointB.Value.Y;
 			var ex = _measureModePointE.Value.X;
 			var ey = _measureModePointE.Value.Y;
+			if (IsPointInSourceImage(bx, by) == false || IsPointInSourceImage(ex, ey) == false) return null;
+
 			distance = Math.Sqrt((bx - ex) * (bx - ex) + (by - ey) * (by - ey));
 			return GetLinePixels(_sourceImage, bx, by, ex, ey);
 		}
@@ -2192,6 +2562,8 @@ namespace ColorImageViewProject
 		{
 			if (_measureModePointB == null || _measureModePointE == null) return null;
 			var rect = CreateRectFromMeasurePoint(_measureModePointB.Value, _measureModePointE.Value);
+			if (IsRectInBitmap(_sourceImage, rect) == false) return null;
+
 			return GetProfileColorsH(_sourceImage, rect);
 		}
 
@@ -2202,6 +2574,8 @@ namespace ColorImageViewProject
 		{
 			if (_measureModePointB == null || _measureModePointE == null) return null;
 			var rect = CreateRectFromMeasurePoint(_measureModePointB.Value, _measureModePointE.Value);
+			if (IsRectInBitmap(_sourceImage, rect) == false) return null;
+
 			return GetProfileColorsV(_sourceImage, rect);
 		}
 
@@ -2211,6 +2585,8 @@ namespace ColorImageViewProject
 		{
 			if (_measureModePointB == null || _measureModePointE == null) return null;
 			var rect = CreateRectFromMeasurePoint(_measureModePointB.Value, _measureModePointE.Value);
+			if (IsRectInBitmap(_sourceImage, rect) == false) return null;
+
 			return GetBoxPixels(_sourceImage, rect);
 		}
 
@@ -2225,8 +2601,12 @@ namespace ColorImageViewProject
 		{
 			try
 			{
+				if (IsRectInBitmap(bmp, rect) == false) return null;
+
+				var bpp = Image.GetPixelFormatSize(bmp.PixelFormat) / 8;
+				if (bpp < 3) return null;
+
 				var ret = new Color[rect.Width];
-				var wrk = new int[rect.Width, 3];
 
 				var bmpData = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height), ImageLockMode.ReadOnly, bmp.PixelFormat);
 				try
@@ -2235,20 +2615,23 @@ namespace ColorImageViewProject
 					var bmpStride = bmpData.Stride;
 
 					// 座標群からそれぞれの位置の色を加算する
-					for (int ixx = 0; ixx < rect.Width; ixx++)
+					for (var ixx = 0; ixx < rect.Width; ixx++)
 					{
 						var xx = rect.X + ixx;
-						for (int iyy = 0; iyy < rect.Height; iyy++)
+						var sumB = 0L;
+						var sumG = 0L;
+						var sumR = 0L;
+						for (var iyy = 0; iyy < rect.Height; iyy++)
 						{
 							var yy = rect.Y + iyy;
-							var sp = bmpScan0 + yy * bmpStride + xx * 3;
-							wrk[ixx, 0] += sp[0];
-							wrk[ixx, 1] += sp[1];
-							wrk[ixx, 2] += sp[2];
+							var sp = bmpScan0 + yy * bmpStride + xx * bpp;
+							sumB += sp[0];
+							sumG += sp[1];
+							sumR += sp[2];
 						}
-						var b= (int) Math.Round(((double)wrk[ixx, 0] / rect.Height), MidpointRounding.AwayFromZero);
-						var g = (int)Math.Round(((double)wrk[ixx, 1] / rect.Height), MidpointRounding.AwayFromZero);
-						var r = (int)Math.Round(((double)wrk[ixx, 2] / rect.Height), MidpointRounding.AwayFromZero);
+						var b = (int)Math.Round(((double)sumB / rect.Height), MidpointRounding.AwayFromZero);
+						var g = (int)Math.Round(((double)sumG / rect.Height), MidpointRounding.AwayFromZero);
+						var r = (int)Math.Round(((double)sumR / rect.Height), MidpointRounding.AwayFromZero);
 						ret[ixx] = Color.FromArgb(r, g, b);
 					}
 					return ret;
@@ -2281,8 +2664,12 @@ namespace ColorImageViewProject
 		{
 			try
 			{
+				if (IsRectInBitmap(bmp, rect) == false) return null;
+
+				var bpp = Image.GetPixelFormatSize(bmp.PixelFormat) / 8;
+				if (bpp < 3) return null;
+
 				var ret = new Color[rect.Height];
-				var wrk = new int[rect.Height, 3];
 
 				var bmpData = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height), ImageLockMode.ReadOnly, bmp.PixelFormat);
 				try
@@ -2291,20 +2678,23 @@ namespace ColorImageViewProject
 					var bmpStride = bmpData.Stride;
 
 					// 座標群からそれぞれの位置の色を加算する
-					for (int iyy = 0; iyy < rect.Height; iyy++)
+					for (var iyy = 0; iyy < rect.Height; iyy++)
 					{
 						var yy = rect.Y + iyy;
-						for (int ixx = 0; ixx < rect.Width; ixx++)
+						var sumB = 0L;
+						var sumG = 0L;
+						var sumR = 0L;
+						for (var ixx = 0; ixx < rect.Width; ixx++)
 						{
 							var xx = rect.X + ixx;
-							var sp = bmpScan0 + yy * bmpStride + xx * 3;
-							wrk[iyy, 0] += sp[0];
-							wrk[iyy, 1] += sp[1];
-							wrk[iyy, 2] += sp[2];
+							var sp = bmpScan0 + yy * bmpStride + xx * bpp;
+							sumB += sp[0];
+							sumG += sp[1];
+							sumR += sp[2];
 						}
-						var b = (int)Math.Round(((double)wrk[iyy, 0] / rect.Width), MidpointRounding.AwayFromZero);
-						var g = (int)Math.Round(((double)wrk[iyy, 1] / rect.Width), MidpointRounding.AwayFromZero);
-						var r = (int)Math.Round(((double)wrk[iyy, 2] / rect.Width), MidpointRounding.AwayFromZero);
+						var b = (int)Math.Round(((double)sumB / rect.Width), MidpointRounding.AwayFromZero);
+						var g = (int)Math.Round(((double)sumG / rect.Width), MidpointRounding.AwayFromZero);
+						var r = (int)Math.Round(((double)sumR / rect.Width), MidpointRounding.AwayFromZero);
 						ret[iyy] = Color.FromArgb(r, g, b);
 					}
 					return ret;
@@ -2340,8 +2730,15 @@ namespace ColorImageViewProject
 			{
 				// 矩形を作成
 				var rect = CreateRectFromMeasurePoint(bx, by, ex, ey);
+				if (IsRectInBitmap(bmp, rect) == false) return null;
 
-				var ret = new Color[rect.Width* rect.Height];
+				var bpp = Image.GetPixelFormatSize(bmp.PixelFormat) / 8;
+				if (bpp < 3) return null;
+
+				var count = (long)rect.Width * rect.Height;
+				if (count > Int32.MaxValue) return null;
+
+				var ret = new Color[(int)count];
 				var cnt = 0;
 
 				var bmpData = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height), ImageLockMode.ReadOnly, bmp.PixelFormat);
@@ -2351,13 +2748,13 @@ namespace ColorImageViewProject
 					var bmpStride = bmpData.Stride;
 
 					// 座標群からそれぞれの位置のカラー群に変換する
-					for (int yy = 0; yy < rect.Height; yy++)
+					for (var yy = 0; yy < rect.Height; yy++)
 					{
-						var sp = bmpScan0 + (yy + rect.Y) * bmpStride + rect.X * 3;
-						for (int xx = 0; xx < rect.Width; xx++)
+						var sp = bmpScan0 + (yy + rect.Y) * bmpStride + rect.X * bpp;
+						for (var xx = 0; xx < rect.Width; xx++)
 						{
 							ret[cnt++] = Color.FromArgb(sp[2], sp[1], sp[0]);			// sp・・B,G,Rの順
-							sp+= 3;
+							sp += bpp;
 						}
 					}
 
@@ -2403,6 +2800,11 @@ namespace ColorImageViewProject
 		{
 			try
 			{
+				if (IsPointInBitmap(bmp, bx, by) == false || IsPointInBitmap(bmp, ex, ey) == false) return null;
+
+				var bpp = Image.GetPixelFormatSize(bmp.PixelFormat) / 8;
+				if (bpp < 3) return null;
+
 				// 直線の通る点群を求める
 				var poss = CreatePossLine(bx, by, ex, ey);
 
@@ -2415,11 +2817,16 @@ namespace ColorImageViewProject
 					var bmpStride = bmpData.Stride;
 
 					// 座標群からそれぞれの位置のカラー群に変換する
-					return poss.Select(p =>
-						{
-							var sp = bmpScan0 + p.Y * bmpStride + p.X * 3;
-							return Color.FromArgb(sp[2], sp[1], sp[0]);			// sp・・B,G,Rの順
-						}).ToArray();
+					for (var i = 0; i < poss.Length; i++)
+					{
+						var p = poss[i];
+						if (IsPointInBitmap(bmp, p.X, p.Y) == false) return null;
+
+						var sp = bmpScan0 + p.Y * bmpStride + p.X * bpp;
+						ret[i] = Color.FromArgb(sp[2], sp[1], sp[0]);			// sp・・B,G,Rの順
+					}
+
+					return ret;
 				}
 				catch
 				{
@@ -2806,6 +3213,7 @@ namespace ColorImageViewProject
 		private void contextMenuStripProfData_Opening(object sender, CancelEventArgs e)
 		{
 			トリミングToolStripMenuItem.Enabled = (_isProfModeLine!= null && _isProfModeLine.Value== false);
+			if (_averageColorImageToolStripMenuItem != null) _averageColorImageToolStripMenuItem.Enabled = IsProfileRangeSpecified();
 		}
 
 
@@ -2909,6 +3317,13 @@ namespace ColorImageViewProject
 						case Keys.S:
 							元画像をファイルに保存ToolStripMenuItem_Click(sender, null);
 							e.Handled = true;           // 以下のコントロールにキーを渡さない
+							break;
+						case Keys.B:
+							if (IsProfileModeToggleKeyTarget())
+							{
+								ToggleProfileMode();
+								e.Handled = true;           // 以下のコントロールにキーを渡さない
+							}
 							break;
 						case Keys.T:
 							EditTitleMode();
@@ -3103,6 +3518,30 @@ namespace ColorImageViewProject
 		/// <summary>プロファイルダイアログの前面表示モード</summary>
 		private ProfileViewerForegroundMode _profileViewerForegroundMode = ProfileViewerForegroundMode.ParentForeground;
 
+		/// <summary>プロファイル範囲線の色</summary>
+		private Color _profileSelectionLineColor = Color.Yellow;
+
+		/// <summary>プロファイル始点カーソルの色</summary>
+		private Color _profileStartCursorColor = Color.Red;
+
+		/// <summary>プロファイル終点カーソルの色</summary>
+		private Color _profileEndCursorColor = Color.GreenYellow;
+
+		/// <summary>プロファイル補助カーソルの色</summary>
+		private Color _profileGuideCursorColor = Color.Orange;
+
+		/// <summary>プロファイル範囲線の太さ</summary>
+		private float _profileSelectionLineWidth = 3.0f;
+
+		/// <summary>プロファイル始点・終点カーソル線の太さ</summary>
+		private float _profilePointCursorLineWidth = 2.0f;
+
+		/// <summary>プロファイル線幅の最小値</summary>
+		private const float MinProfileLineWidth = 0.5f;
+
+		/// <summary>プロファイル線幅の最大値</summary>
+		private const float MaxProfileLineWidth = 20.0f;
+
 
 		/// <summary>
 		/// コンストラクタです
@@ -3140,6 +3579,12 @@ namespace ColorImageViewProject
 
 			_backColor = Color.Black;
 			_profileViewerForegroundMode = ProfileViewerForegroundMode.ParentForeground;
+			_profileSelectionLineColor = Color.Yellow;
+			_profileStartCursorColor = Color.Red;
+			_profileEndCursorColor = Color.GreenYellow;
+			_profileGuideCursorColor = Color.Orange;
+			_profileSelectionLineWidth = 3.0f;
+			_profilePointCursorLineWidth = 2.0f;
 		}
 
 
@@ -3170,12 +3615,31 @@ namespace ColorImageViewProject
 
 
 		/// <summary>
+		/// プロファイル線幅を設定可能範囲に収めます</summary>
+		/// <param name="value">線幅</param>
+		/// <param name="defaultValue">既定値</param>
+		/// <returns>補正後の線幅</returns>
+		private static float NormalizeProfileLineWidth(float value, float defaultValue)
+		{
+			if (float.IsNaN(value) || float.IsInfinity(value)) return defaultValue;
+			return Math.Max(MinProfileLineWidth, Math.Min(MaxProfileLineWidth, value));
+		}
+
+
+		/// <summary>
 		/// クローンを生成します
 		/// </summary>
 		/// <returns>生成されたクローンオブジェクト</returns>
 		public object Clone()
 		{
-			return new ColImageSetteings(_mainInterpolationMode, _mainInterpolationModeReduce, _backColor, _profileViewerForegroundMode);
+			var clone = new ColImageSetteings(_mainInterpolationMode, _mainInterpolationModeReduce, _backColor, _profileViewerForegroundMode);
+			clone.ProfileSelectionLineColor = _profileSelectionLineColor;
+			clone.ProfileStartCursorColor = _profileStartCursorColor;
+			clone.ProfileEndCursorColor = _profileEndCursorColor;
+			clone.ProfileGuideCursorColor = _profileGuideCursorColor;
+			clone.ProfileSelectionLineWidth = _profileSelectionLineWidth;
+			clone.ProfilePointCursorLineWidth = _profilePointCursorLineWidth;
+			return clone;
 		}
 
 		/// <summary>
@@ -3186,7 +3650,26 @@ namespace ColorImageViewProject
 		public int CompareTo(object obj)
 		{
 			var dst = (ColImageSetteings)obj;
-			return CompareAllMenber(dst.MainInterpolationMode, dst.MainInterpolationModeReduce, dst.BackColor, dst.ProfileViewerForegroundMode);
+			var w = CompareAllMenber(dst.MainInterpolationMode, dst.MainInterpolationModeReduce, dst.BackColor, dst.ProfileViewerForegroundMode);
+			if (w != 0) return w;
+
+			w = _profileSelectionLineColor.ToArgb() - dst.ProfileSelectionLineColor.ToArgb();
+			if (w != 0) return w;
+
+			w = _profileStartCursorColor.ToArgb() - dst.ProfileStartCursorColor.ToArgb();
+			if (w != 0) return w;
+
+			w = _profileEndCursorColor.ToArgb() - dst.ProfileEndCursorColor.ToArgb();
+			if (w != 0) return w;
+
+			w = _profileGuideCursorColor.ToArgb() - dst.ProfileGuideCursorColor.ToArgb();
+			if (w != 0) return w;
+
+			w = _profileSelectionLineWidth.CompareTo(dst.ProfileSelectionLineWidth);
+			if (w != 0) return w;
+
+			w = _profilePointCursorLineWidth.CompareTo(dst.ProfilePointCursorLineWidth);
+			return w;
 
 		}
 
@@ -3231,6 +3714,72 @@ namespace ColorImageViewProject
 		{
 			set { _profileViewerForegroundMode = value; }
 			get { return _profileViewerForegroundMode; }
+		}
+
+		[Category("３．プロファイル指定表示")]
+		[Description("プロファイル範囲を示す線または矩形の色")]
+		[DefaultValue(typeof(Color), "Yellow")]
+		[PropertyDisplayName("01.範囲線色")]
+		/// <summary>プロファイル範囲線の色を取得または設定します</summary>
+		public Color ProfileSelectionLineColor
+		{
+			set { _profileSelectionLineColor = value; }
+			get { return _profileSelectionLineColor; }
+		}
+
+		[Category("３．プロファイル指定表示")]
+		[Description("プロファイル始点十字カーソルの色")]
+		[DefaultValue(typeof(Color), "Red")]
+		[PropertyDisplayName("02.始点カーソル色")]
+		/// <summary>プロファイル始点カーソルの色を取得または設定します</summary>
+		public Color ProfileStartCursorColor
+		{
+			set { _profileStartCursorColor = value; }
+			get { return _profileStartCursorColor; }
+		}
+
+		[Category("３．プロファイル指定表示")]
+		[Description("プロファイル終点十字カーソルの色")]
+		[DefaultValue(typeof(Color), "GreenYellow")]
+		[PropertyDisplayName("03.終点カーソル色")]
+		/// <summary>プロファイル終点カーソルの色を取得または設定します</summary>
+		public Color ProfileEndCursorColor
+		{
+			set { _profileEndCursorColor = value; }
+			get { return _profileEndCursorColor; }
+		}
+
+		[Category("３．プロファイル指定表示")]
+		[Description("プロファイルビュー上のカーソルに対応して画像上に表示する補助線の色")]
+		[DefaultValue(typeof(Color), "Orange")]
+		[PropertyDisplayName("04.補助カーソル色")]
+		/// <summary>プロファイル補助カーソルの色を取得または設定します</summary>
+		public Color ProfileGuideCursorColor
+		{
+			set { _profileGuideCursorColor = value; }
+			get { return _profileGuideCursorColor; }
+		}
+
+		[Category("３．プロファイル指定表示")]
+		[Description("プロファイル範囲を示す線または矩形の太さ。表示倍率に応じて見かけの太さを保つよう補正します")]
+		[DefaultValue(3.0f)]
+		[PropertyDisplayName("05.範囲線太さ")]
+		/// <summary>プロファイル範囲線の太さを取得または設定します</summary>
+		public float ProfileSelectionLineWidth
+		{
+			set { _profileSelectionLineWidth = NormalizeProfileLineWidth(value, 3.0f); }
+			get { return _profileSelectionLineWidth; }
+		}
+
+		[Category("３．プロファイル指定表示")]
+		[Description("プロファイル始点・終点十字カーソルの線の太さ。表示倍率に応じて見かけの太さを保つよう補正します")]
+		[DefaultValue(2.0f)]
+		[PropertyDisplayName("06.始点終点線太さ")]
+		/// <summary>プロファイル始点・終点カーソル線の太さを取得または設定します</summary>
+		public float ProfilePointCursorLineWidth
+		{
+			set { _profilePointCursorLineWidth = NormalizeProfileLineWidth(value, 2.0f); }
+			get { return _profilePointCursorLineWidth; }
 		}
 
 	}

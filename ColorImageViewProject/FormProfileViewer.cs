@@ -41,6 +41,9 @@ namespace ColorImageViewProject
 		/// <summary>プロファイル2点測定結果を表示するテキストボックスを保持します</summary>
 		private TextBox _tboxMeasureStatistics;
 
+		/// <summary>プロファイルのピント指標を表示するテキストボックスを保持します</summary>
+		private TextBox _tboxProfileFocus;
+
 		/// <summary指定されたピクセルデータ全体の距離（長さ）を保持します</summary>
 		/// <remarks>指定されたピクセルデータ群は傾きがあるラインの場合には、ピクセル距離とピクセル数が一致しないため外側から指定する</remarks>
 		private double _distDatas;
@@ -70,6 +73,9 @@ namespace ColorImageViewProject
 
 		/// <summary>前面表示モードを変更したときに呼び出されるアクションを保持します</summary>
 		private Action<ProfileViewerForegroundMode> _onForegroundModeChangedAction;
+
+		/// <summary>プロファイルモードを切り替えるときに呼び出されるアクションを保持します</summary>
+		private Action _onToggleProfileModeAction;
 
 		/// <summary>前面表示モードで参照する親フォームを保持します</summary>
 		private Form _foregroundOwner;
@@ -103,7 +109,8 @@ namespace ColorImageViewProject
 		/// <param name="onClick">クリック時のコールバックアクション　　OnClick(int idx)</param>
 		/// <param name="onMeasureRange">2点測定範囲変更時のコールバックアクション</param>
 		/// <param name="onForegroundModeChanged">前面表示モード変更時のコールバックアクション</param>
-		public FormProfileViewer(Color[] datas, string title, Action onClosing = null, double distance = 0.0, Icon ic = null, Action<double> onClick = null, Action<double?, double?> onMeasureRange = null, Action<ProfileViewerForegroundMode> onForegroundModeChanged = null)
+		/// <param name="onToggleProfileMode">プロファイルモード切替時のコールバックアクション</param>
+		public FormProfileViewer(Color[] datas, string title, Action onClosing = null, double distance = 0.0, Icon ic = null, Action<double> onClick = null, Action<double?, double?> onMeasureRange = null, Action<ProfileViewerForegroundMode> onForegroundModeChanged = null, Action onToggleProfileMode = null)
 		{
 			InitializeComponent();
 			InitializeProfileAnalysisControls();
@@ -119,6 +126,7 @@ namespace ColorImageViewProject
 			_onClickAction = onClick;
 			_onMeasureRangeAction = onMeasureRange;
 			_onForegroundModeChangedAction = onForegroundModeChanged;
+			_onToggleProfileModeAction = onToggleProfileMode;
 			_lastDist = null;
 
 			// キーを一旦フォームが受け取る
@@ -130,7 +138,7 @@ namespace ColorImageViewProject
 		/// プロファイル解析情報表示用コントロールを初期化します</summary>
 		private void InitializeProfileAnalysisControls()
 		{
-			const int extraHeight = 60;
+			const int extraHeight = 84;
 			var graphHeight = pboxGraph.Height;
 			var graphAnchor = pboxGraph.Anchor;
 			var lowerControls = Controls.Cast<Control>().Where(w => w != pboxGraph && w.Top >= pboxGraph.Bottom).ToArray();
@@ -154,8 +162,10 @@ namespace ColorImageViewProject
 
 			_tboxProfileStatistics = CreateProfileAnalysisTextBox(pboxGraph.Bottom + 4);
 			_tboxMeasureStatistics = CreateProfileAnalysisTextBox(_tboxProfileStatistics.Bottom + 3);
+			_tboxProfileFocus = CreateProfileAnalysisTextBox(_tboxMeasureStatistics.Bottom + 3);
 			Controls.Add(_tboxProfileStatistics);
 			Controls.Add(_tboxMeasureStatistics);
+			Controls.Add(_tboxProfileFocus);
 
 			ResumeLayout(false);
 			PerformLayout();
@@ -331,8 +341,10 @@ namespace ColorImageViewProject
 		/// <param name="e">イベント情報</param>
 		private void FormProfileViewer_FormClosing(object sender, FormClosingEventArgs e)
 		{
-			e.Cancel = IsIgnoreClose;
-			if (IsIgnoreClose)
+			if (IsIgnoreClose == false || e.CloseReason != CloseReason.UserClosing) return;
+
+			e.Cancel = true;
+			if (Visible)
 			{
 				this.Hide();
 			}
@@ -950,9 +962,10 @@ namespace ColorImageViewProject
 		/// プロファイル解析情報表示を更新します</summary>
 		private void UpdateProfileAnalysisText()
 		{
-			if (_tboxProfileStatistics == null || _tboxMeasureStatistics == null) return;
+			if (_tboxProfileStatistics == null || _tboxMeasureStatistics == null || _tboxProfileFocus == null) return;
 			_tboxProfileStatistics.Text = CreateProfileStatisticsText("全体", 0, (_colorDatas?.Length ?? 0) - 1);
 			_tboxMeasureStatistics.Text = CreateProfileMeasureText();
+			_tboxProfileFocus.Text = CreateProfileFocusText("ピント", 0, (_colorDatas?.Length ?? 0) - 1);
 		}
 
 
@@ -999,16 +1012,96 @@ namespace ColorImageViewProject
 
 
 		/// <summary>
+		/// プロファイルピント指標表示文字列を生成します</summary>
+		/// <param name="title">表示タイトル</param>
+		/// <param name="bgnIdx">開始インデックス</param>
+		/// <param name="endIdx">終了インデックス</param>
+		/// <returns>プロファイルピント指標表示文字列</returns>
+		private string CreateProfileFocusText(string title, int bgnIdx, int endIdx)
+		{
+			if (TryCalculateProfileFocusMetrics(bgnIdx, endIdx, out var adjacentSquareMean, out var adjacentRms, out var laplacianSquareMean) == false) return $"{title}: ----";
+			return $"{title}: 隣接輝度差二乗平均={FormatMetricValue(adjacentSquareMean)}, 平方根={FormatMetricValue(adjacentRms)}, ラプラシアン二乗平均={FormatMetricValue(laplacianSquareMean)}";
+		}
+
+
+		/// <summary>
+		/// プロファイルピント指標を算出します</summary>
+		/// <param name="bgnIdx">開始インデックス</param>
+		/// <param name="endIdx">終了インデックス</param>
+		/// <param name="adjacentSquareMean">隣接輝度差二乗平均</param>
+		/// <param name="adjacentRms">隣接輝度差二乗平均の平方根</param>
+		/// <param name="laplacianSquareMean">ラプラシアン二乗平均</param>
+		/// <returns>算出できた場合true</returns>
+		private bool TryCalculateProfileFocusMetrics(int bgnIdx, int endIdx, out double adjacentSquareMean, out double adjacentRms, out double laplacianSquareMean)
+		{
+			adjacentSquareMean = Double.NaN;
+			adjacentRms = Double.NaN;
+			laplacianSquareMean = Double.NaN;
+			if (_colorDatas == null || _colorDatas.Length < 2) return false;
+
+			var bgn = Math.Max(0, Math.Min(bgnIdx, endIdx));
+			var end = Math.Min(_colorDatas.Length - 1, Math.Max(bgnIdx, endIdx));
+			if (end - bgn + 1 < 2) return false;
+
+			var grays = new int[end - bgn + 1];
+			for (var i = bgn; i <= end; i++)
+			{
+				var col = _colorDatas[i];
+				grays[i - bgn] = RgbToGray(col.R, col.G, col.B);
+			}
+
+			var adjacentCount = 0;
+			var adjacentSquareSum = 0.0;
+			for (var i = 1; i < grays.Length; i++)
+			{
+				var diff = grays[i] - grays[i - 1];
+				adjacentSquareSum += (double)diff * diff;
+				adjacentCount++;
+			}
+			adjacentSquareMean = adjacentSquareSum / adjacentCount;
+			adjacentRms = Math.Sqrt(adjacentSquareMean);
+
+			if (grays.Length >= 3)
+			{
+				var laplacianCount = 0;
+				var laplacianSquareSum = 0.0;
+				for (var i = 1; i < grays.Length - 1; i++)
+				{
+					var laplacian = grays[i - 1] - 2 * grays[i] + grays[i + 1];
+					laplacianSquareSum += (double)laplacian * laplacian;
+					laplacianCount++;
+				}
+				laplacianSquareMean = laplacianSquareSum / laplacianCount;
+			}
+
+			return true;
+		}
+
+
+		/// <summary>
+		/// 指標値を表示用文字列に変換します</summary>
+		/// <param name="value">指標値</param>
+		/// <returns>表示文字列</returns>
+		private string FormatMetricValue(double value)
+		{
+			if (Double.IsNaN(value) || Double.IsInfinity(value)) return "----";
+			if (Math.Abs(value) >= 1000.0) return value.ToString("0");
+			if (Math.Abs(value) >= 100.0) return value.ToString("0.0");
+			return value.ToString("0.00");
+		}
+
+
+		/// <summary>
 		/// プロファイル2点測定表示文字列を生成します</summary>
 		/// <returns>プロファイル2点測定表示文字列</returns>
 		private string CreateProfileMeasureText()
 		{
 			if (_colorDatas == null || _colorDatas.Length == 0) return "2点: ----";
-			if (_measureDistB == null || _measureDistE == null) return "2点: 1点目を左クリック、2点目を左クリックまたはドラッグで指定します。Escでクリア。";
+			if (_measureDistB == null || _measureDistE == null) return "2点: グラフをクリックしてA/Bを指定。ドラッグでB更新。Escでクリア。";
 
 			var idxB = DistanceToIndex(_measureDistB.Value);
 			var idxE = DistanceToIndex(_measureDistE.Value);
-			if (idxB < 0 || idxE < 0) return "2点: 1点目を左クリック、2点目を左クリックまたはドラッグで指定します。Escでクリア。";
+			if (idxB < 0 || idxE < 0) return "2点: グラフをクリックしてA/Bを指定。ドラッグでB更新。Escでクリア。";
 
 			var colB = _colorDatas[idxB];
 			var colE = _colorDatas[idxE];
@@ -1104,6 +1197,17 @@ namespace ColorImageViewProject
 					DrawAllGraph();
 					Refresh();
 					e.Handled = true;
+					break;
+				case Keys.B:
+					if ((Control.ModifierKeys & Keys.Control) == Keys.Control &&
+						(Control.ModifierKeys & Keys.Shift) != Keys.Shift &&
+						(Control.ModifierKeys & Keys.Alt) != Keys.Alt &&
+						_onToggleProfileModeAction != null)
+					{
+						var invoker = _foregroundOwner != null && _foregroundOwner.IsDisposed == false && _foregroundOwner.IsHandleCreated ? _foregroundOwner : this;
+						invoker.BeginInvoke(new Action(() => _onToggleProfileModeAction()));
+						e.Handled = true;
+					}
 					break;
 			}
 		}
