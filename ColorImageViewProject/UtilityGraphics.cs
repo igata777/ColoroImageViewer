@@ -282,12 +282,38 @@ namespace ColorImageViewProject
 			{
 				case ".JPG":
 				case ".JPEG":
+				case ".JPE":
+				case ".JFIF":
+				case ".JFI":
 				case ".PNG":
 				case ".BMP":
+				case ".DIB":
 				case ".GIF":
 				case ".TIF":
 				case ".TIFF":
 				case ".WEBP":
+				case ".AVIF":
+				case ".HEIC":
+				case ".HEIF":
+					return true;
+				default:
+					return false;
+			}
+		}
+
+
+		/// <summary>
+		/// 読み込み可否が実行環境の画像コーデックに依存する画像ファイルか判定します</summary>
+		/// <param name="filepath">ファイルパス</param>
+		/// <returns>実行環境の画像コーデックに依存する場合、true</returns>
+		static public bool IsEnvironmentCodecImageFile(string filepath)
+		{
+			switch (Path.GetExtension(filepath).ToUpperInvariant())
+			{
+				case ".WEBP":
+				case ".AVIF":
+				case ".HEIC":
+				case ".HEIF":
 					return true;
 				default:
 					return false;
@@ -296,7 +322,7 @@ namespace ColorImageViewProject
 
 
 		/// <summary>画像保存ダイアログ用のフィルター文字列</summary>
-		public const string ImageSaveFileDialogFilter = "PNGファイル(*.png)|*.png|JPGファイル(*.jpg)|*.jpg|ビットマップファイル(*.bmp)|*.bmp|TIFFファイル(*.tif)|*.tif|すべてのファイル(*.*)|*.*";
+		public const string ImageSaveFileDialogFilter = "PNGファイル(*.png)|*.png|JPEGファイル(*.jpg;*.jpeg;*.jpe;*.jfif;*.jfi)|*.jpg;*.jpeg;*.jpe;*.jfif;*.jfi|ビットマップファイル(*.bmp;*.dib)|*.bmp;*.dib|TIFFファイル(*.tif;*.tiff)|*.tif;*.tiff|すべてのファイル(*.*)|*.*";
 
 
 		/// <summary>
@@ -310,9 +336,13 @@ namespace ColorImageViewProject
 			{
 				case ".JPG":
 				case ".JPEG":
+				case ".JPE":
+				case ".JFIF":
+				case ".JFI":
 					imgFormat = ImageFormat.Jpeg;
 					return true;
 				case ".BMP":
+				case ".DIB":
 					imgFormat = ImageFormat.Bmp;
 					return true;
 				case ".PNG":
@@ -431,7 +461,7 @@ namespace ColorImageViewProject
 			bmp = LoadBitmapPF(filepath, pf);
 			if (bmp == null)
 			{
-				failureReason = "画像として読み込めません";
+				failureReason = IsEnvironmentCodecImageFile(filepath) ? "画像として読み込めません（この形式は実行環境の画像コーデックに依存します）" : "画像として読み込めません";
 				return false;
 			}
 

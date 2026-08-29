@@ -42,6 +42,21 @@ using System.Threading.Tasks;
 
 namespace ColorImageViewProject
 {
+	/// <summary>
+	/// プロファイルダイアログの前面表示モードです</summary>
+	public enum ProfileViewerForegroundMode
+	{
+		/// <summary>画像情報画面の前面に表示します</summary>
+		ParentForeground,
+
+		/// <summary>常に最前面に表示します</summary>
+		AlwaysTopMost,
+
+		/// <summary>通常のウィンドウとして表示します</summary>
+		Normal
+	}
+
+
 	/// <summary>カラー情報表示用フォームクラスです</summary>
 	public partial class FormColorImageS : Form
 	{
@@ -1020,12 +1035,12 @@ namespace ColorImageViewProject
 				{
 					if (_isProfModeLine == true)
 					{
-						if (_formProfViewerLine != null) _formProfViewerLine.Show();
+						ShowProfileViewer(_formProfViewerLine);
 					}
 					else
 					{
-						if (_formProfViewerBoxH != null) _formProfViewerBoxH.Show();
-						if (_formProfViewerBoxV != null) _formProfViewerBoxV.Show();
+						ShowProfileViewer(_formProfViewerBoxH);
+						ShowProfileViewer(_formProfViewerBoxV);
 					}
 				}
 
@@ -1515,7 +1530,48 @@ namespace ColorImageViewProject
 			_scalePbox.InterpolationMode = _settings.MainInterpolationMode;
 			_scalePbox.InterpolationModeReduce = _settings.MainInterpolationModeReduce;
 			_scalePbox.BasePbox.BackColor = _settings.BackColor;
+			ApplyProfileViewerForegroundMode();
 			_scalePbox.DrawMainImage();
+		}
+
+
+		/// <summary>
+		/// プロファイルダイアログの前面表示モードを適用します</summary>
+		private void ApplyProfileViewerForegroundMode()
+		{
+			ApplyProfileViewerForegroundMode(_formProfViewerLine);
+			ApplyProfileViewerForegroundMode(_formProfViewerBoxH);
+			ApplyProfileViewerForegroundMode(_formProfViewerBoxV);
+		}
+
+
+		/// <summary>
+		/// プロファイルダイアログの前面表示モードを適用します</summary>
+		/// <param name="profileViewer">プロファイルダイアログ</param>
+		private void ApplyProfileViewerForegroundMode(FormProfileViewer profileViewer)
+		{
+			if (profileViewer == null || profileViewer.IsDisposed) return;
+			profileViewer.ApplyForegroundMode(this, _settings.ProfileViewerForegroundMode);
+		}
+
+
+		/// <summary>
+		/// プロファイルダイアログを前面表示モードに従って表示します</summary>
+		/// <param name="profileViewer">プロファイルダイアログ</param>
+		private void ShowProfileViewer(FormProfileViewer profileViewer)
+		{
+			if (profileViewer == null || profileViewer.IsDisposed) return;
+			profileViewer.ShowWithForegroundMode(this, _settings.ProfileViewerForegroundMode);
+		}
+
+
+		/// <summary>
+		/// プロファイルダイアログから前面表示モードが変更されたときの処理です</summary>
+		/// <param name="foregroundMode">前面表示モード</param>
+		private void OnProfileViewerForegroundModeChanged(ProfileViewerForegroundMode foregroundMode)
+		{
+			_settings.ProfileViewerForegroundMode = foregroundMode;
+			ApplyProfileViewerForegroundMode();
 		}
 
 
@@ -2068,12 +2124,12 @@ namespace ColorImageViewProject
 				var pData = CalcLineProfile( out var distance );
 				if (_formProfViewerLine == null)
 				{
-					_formProfViewerLine = new FormProfileViewer(pData, "ラインプロファイル", null, distance, this.Icon, OnLineProfileCursorChanged, OnLineProfileRangeChanged);
-					_formProfViewerLine.Show();
+					_formProfViewerLine = new FormProfileViewer(pData, "ラインプロファイル", null, distance, this.Icon, OnLineProfileCursorChanged, OnLineProfileRangeChanged, OnProfileViewerForegroundModeChanged);
+					ShowProfileViewer(_formProfViewerLine);
 				}
 				else{
 					_formProfViewerLine.SetData(pData, distance);
-					if (isForce)_formProfViewerLine.Show();
+					if (isForce) ShowProfileViewer(_formProfViewerLine);
 				}
 				// データがあれば平均値を表示（なければクリア）
 				labelAverageColor.Text = (pData != null && pData.Any()) ? $"平均色 {AverageColorString(pData)}" : "";
@@ -2085,25 +2141,25 @@ namespace ColorImageViewProject
 				var pDataH = CalcBoxHProfile();
 				if (_formProfViewerBoxH == null)
 				{
-					_formProfViewerBoxH = new FormProfileViewer(pDataH, "水平プロファイル", null, 0.0, this.Icon, OnBoxHProfileCursorChanged, OnBoxHProfileRangeChanged);
-					_formProfViewerBoxH.Show();
+					_formProfViewerBoxH = new FormProfileViewer(pDataH, "水平プロファイル", null, 0.0, this.Icon, OnBoxHProfileCursorChanged, OnBoxHProfileRangeChanged, OnProfileViewerForegroundModeChanged);
+					ShowProfileViewer(_formProfViewerBoxH);
 				}
 				else
 				{
 					_formProfViewerBoxH.SetData(pDataH, 0.0);
-					if (isForce) _formProfViewerBoxH.Show();
+					if (isForce) ShowProfileViewer(_formProfViewerBoxH);
 				}
 
 				var pDataV = CalcBoxVProfile();
 				if (_formProfViewerBoxV == null)
 				{
-					_formProfViewerBoxV = new FormProfileViewer(pDataV, "垂直プロファイル", null, 0.0, this.Icon, OnBoxVProfileCursorChanged, OnBoxVProfileRangeChanged);
-					_formProfViewerBoxV.Show();
+					_formProfViewerBoxV = new FormProfileViewer(pDataV, "垂直プロファイル", null, 0.0, this.Icon, OnBoxVProfileCursorChanged, OnBoxVProfileRangeChanged, OnProfileViewerForegroundModeChanged);
+					ShowProfileViewer(_formProfViewerBoxV);
 				}
 				else
 				{
 					_formProfViewerBoxV.SetData(pDataV, 0.0);
-					if (isForce) _formProfViewerBoxV.Show();
+					if (isForce) ShowProfileViewer(_formProfViewerBoxV);
 				}
 
 				var pData = GetBoxProfile();
@@ -2884,12 +2940,12 @@ namespace ColorImageViewProject
 							{
 								if (_isProfModeLine == true)
 								{
-									if (_formProfViewerLine != null) _formProfViewerLine.Show();
+									ShowProfileViewer(_formProfViewerLine);
 								}
 								else
 								{
-									if (_formProfViewerBoxH != null) _formProfViewerBoxH.Show();
-									if (_formProfViewerBoxV != null) _formProfViewerBoxV.Show();
+									ShowProfileViewer(_formProfViewerBoxH);
+									ShowProfileViewer(_formProfViewerBoxV);
 								}
 							}
 							break;
@@ -3044,6 +3100,9 @@ namespace ColorImageViewProject
 		/// <summary> 背景（画像のない部分）の色 </summary>
 		private Color _backColor = Color.Black;
 
+		/// <summary>プロファイルダイアログの前面表示モード</summary>
+		private ProfileViewerForegroundMode _profileViewerForegroundMode = ProfileViewerForegroundMode.ParentForeground;
+
 
 		/// <summary>
 		/// コンストラクタです
@@ -3060,11 +3119,13 @@ namespace ColorImageViewProject
 		/// <param name="interpolMode">表示画像の拡大・縮小時の方法</param>
 		/// <param name="interpolModeR">縮小時の表示画像の拡大・縮小時の方法</param>
 		/// <param name="bkCol">背景色</param>
-		public ColImageSetteings(InterpolationMode interpolMode, InterpolationMode interpolModeR, Color bkCol)
+		/// <param name="profileViewerForegroundMode">プロファイルダイアログの前面表示モード</param>
+		public ColImageSetteings(InterpolationMode interpolMode, InterpolationMode interpolModeR, Color bkCol, ProfileViewerForegroundMode profileViewerForegroundMode = ProfileViewerForegroundMode.ParentForeground)
 		{
 			_mainInterpolationMode = interpolMode;
 			_mainInterpolationModeReduce = interpolModeR;
 			_backColor = bkCol;
+			_profileViewerForegroundMode = profileViewerForegroundMode;
 		}
 
 
@@ -3078,6 +3139,7 @@ namespace ColorImageViewProject
 			_mainInterpolationModeReduce = InterpolationMode.HighQualityBilinear;
 
 			_backColor = Color.Black;
+			_profileViewerForegroundMode = ProfileViewerForegroundMode.ParentForeground;
 		}
 
 
@@ -3087,8 +3149,9 @@ namespace ColorImageViewProject
 		/// <param name="interpolMode">表示画像の拡大・縮小時の方法</param>
 		/// <param name="interpolModeR">縮小時の表示画像の拡大・縮小時の方法</param>
 		/// <param name="bkCol">背景色</param>
+		/// <param name="profileViewerForegroundMode">プロファイルダイアログの前面表示モード</param>
 		/// <returns>比較結果 0:一致</returns>
-		public int CompareAllMenber(InterpolationMode mainInterpolationMode, InterpolationMode mainInterpolationModeR, Color bkCol)
+		public int CompareAllMenber(InterpolationMode mainInterpolationMode, InterpolationMode mainInterpolationModeR, Color bkCol, ProfileViewerForegroundMode profileViewerForegroundMode = ProfileViewerForegroundMode.ParentForeground)
 		{
 			var w = (int)_mainInterpolationMode.CompareTo(mainInterpolationMode);
 			if (w != 0) return w;
@@ -3097,6 +3160,9 @@ namespace ColorImageViewProject
 			if (w != 0) return w;
 
 			w = _backColor.ToArgb() - bkCol.ToArgb();
+			if (w != 0) return w;
+
+			w = _profileViewerForegroundMode.CompareTo(profileViewerForegroundMode);
 			if (w != 0) return w;
 
 			return w;
@@ -3109,7 +3175,7 @@ namespace ColorImageViewProject
 		/// <returns>生成されたクローンオブジェクト</returns>
 		public object Clone()
 		{
-			return new ColImageSetteings(_mainInterpolationMode, _mainInterpolationModeReduce, _backColor);
+			return new ColImageSetteings(_mainInterpolationMode, _mainInterpolationModeReduce, _backColor, _profileViewerForegroundMode);
 		}
 
 		/// <summary>
@@ -3120,7 +3186,7 @@ namespace ColorImageViewProject
 		public int CompareTo(object obj)
 		{
 			var dst = (ColImageSetteings)obj;
-			return CompareAllMenber(dst.MainInterpolationMode, dst.MainInterpolationModeReduce, dst.BackColor);
+			return CompareAllMenber(dst.MainInterpolationMode, dst.MainInterpolationModeReduce, dst.BackColor, dst.ProfileViewerForegroundMode);
 
 		}
 
@@ -3154,6 +3220,17 @@ namespace ColorImageViewProject
 		{
 			set { _backColor = value; }
 			get { return _backColor; }
+		}
+
+		[Category("２．プロファイル表示")]
+		[Description("プロファイルダイアログの前面表示モード。ParentForeground: 画像情報画面の前面、AlwaysTopMost: 常に最前面、Normal: 通常表示")]
+		[DefaultValue(ProfileViewerForegroundMode.ParentForeground)]
+		[PropertyDisplayName("04.プロファイルダイアログ前面表示")]
+		/// <summary>プロファイルダイアログの前面表示モードを取得または設定します</summary>
+		public ProfileViewerForegroundMode ProfileViewerForegroundMode
+		{
+			set { _profileViewerForegroundMode = value; }
+			get { return _profileViewerForegroundMode; }
 		}
 
 	}

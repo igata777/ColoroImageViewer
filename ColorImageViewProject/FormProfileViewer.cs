@@ -68,6 +68,27 @@ namespace ColorImageViewProject
 		/// <summary>2点測定範囲を変更したときに呼び出されるアクションを保持します</summary>
 		private Action<double?, double?> _onMeasureRangeAction;
 
+		/// <summary>前面表示モードを変更したときに呼び出されるアクションを保持します</summary>
+		private Action<ProfileViewerForegroundMode> _onForegroundModeChangedAction;
+
+		/// <summary>前面表示モードで参照する親フォームを保持します</summary>
+		private Form _foregroundOwner;
+
+		/// <summary>現在の前面表示モードを保持します</summary>
+		private ProfileViewerForegroundMode _foregroundMode = ProfileViewerForegroundMode.ParentForeground;
+
+		/// <summary>前面表示モードメニューを保持します</summary>
+		private ToolStripMenuItem _foregroundModeMenuItem;
+
+		/// <summary>画像情報画面の前面表示メニューを保持します</summary>
+		private ToolStripMenuItem _parentForegroundMenuItem;
+
+		/// <summary>常に最前面表示メニューを保持します</summary>
+		private ToolStripMenuItem _alwaysTopMostMenuItem;
+
+		/// <summary>通常表示メニューを保持します</summary>
+		private ToolStripMenuItem _normalForegroundMenuItem;
+
 		/// <summary>クローズ処理を無視するフラグです</summary>
 		public bool IsIgnoreClose { get; set; }
 
@@ -81,10 +102,12 @@ namespace ColorImageViewProject
 		/// <param name="ic">アイコン</param>
 		/// <param name="onClick">クリック時のコールバックアクション　　OnClick(int idx)</param>
 		/// <param name="onMeasureRange">2点測定範囲変更時のコールバックアクション</param>
-		public FormProfileViewer(Color[] datas, string title, Action onClosing = null, double distance = 0.0, Icon ic = null, Action<double> onClick = null, Action<double?, double?> onMeasureRange = null)
+		/// <param name="onForegroundModeChanged">前面表示モード変更時のコールバックアクション</param>
+		public FormProfileViewer(Color[] datas, string title, Action onClosing = null, double distance = 0.0, Icon ic = null, Action<double> onClick = null, Action<double?, double?> onMeasureRange = null, Action<ProfileViewerForegroundMode> onForegroundModeChanged = null)
 		{
 			InitializeComponent();
 			InitializeProfileAnalysisControls();
+			InitializeForegroundModeMenu();
 
 			_matWorkPbox = new Matrix();
 			SetData(datas, distance, false);
@@ -95,6 +118,7 @@ namespace ColorImageViewProject
 			if (ic != null) this.Icon = ic;
 			_onClickAction = onClick;
 			_onMeasureRangeAction = onMeasureRange;
+			_onForegroundModeChangedAction = onForegroundModeChanged;
 			_lastDist = null;
 
 			// キーを一旦フォームが受け取る
@@ -159,15 +183,126 @@ namespace ColorImageViewProject
 
 
 		/// <summary>
+		/// 前面表示モードメニューを初期化します</summary>
+		private void InitializeForegroundModeMenu()
+		{
+			_parentForegroundMenuItem = CreateForegroundModeMenuItem("画像情報画面の前面", ProfileViewerForegroundMode.ParentForeground);
+			_alwaysTopMostMenuItem = CreateForegroundModeMenuItem("常に最前面", ProfileViewerForegroundMode.AlwaysTopMost);
+			_normalForegroundMenuItem = CreateForegroundModeMenuItem("通常表示", ProfileViewerForegroundMode.Normal);
+			_foregroundModeMenuItem = new ToolStripMenuItem("前面表示");
+			_foregroundModeMenuItem.DropDownItems.AddRange(new ToolStripItem[] { _parentForegroundMenuItem, _alwaysTopMostMenuItem, _normalForegroundMenuItem });
+			contextMenuStrip1.Items.Add(new ToolStripSeparator());
+			contextMenuStrip1.Items.Add(_foregroundModeMenuItem);
+			contextMenuStrip1.Opening += contextMenuStrip1_Opening;
+			UpdateForegroundModeMenuItems();
+		}
+
+
+		/// <summary>
+		/// 前面表示モードメニュー項目を生成します</summary>
+		/// <param name="text">表示テキスト</param>
+		/// <param name="foregroundMode">前面表示モード</param>
+		/// <returns>前面表示モードメニュー項目</returns>
+		private ToolStripMenuItem CreateForegroundModeMenuItem(string text, ProfileViewerForegroundMode foregroundMode)
+		{
+			var menuItem = new ToolStripMenuItem(text)
+			{
+				CheckOnClick = false,
+				Tag = foregroundMode
+			};
+			menuItem.Click += ForegroundModeMenuItem_Click;
+			return menuItem;
+		}
+
+
+		/// <summary>
+		/// コンテキストメニューが開くときの処理です</summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void contextMenuStrip1_Opening(object sender, CancelEventArgs e)
+		{
+			UpdateForegroundModeMenuItems();
+		}
+
+
+		/// <summary>
+		/// 前面表示モードメニュー項目がクリックされたときの処理です</summary>
+		/// <param name="sender">送信元情報</param>
+		/// <param name="e">イベント情報</param>
+		private void ForegroundModeMenuItem_Click(object sender, EventArgs e)
+		{
+			if (sender is not ToolStripMenuItem menuItem) return;
+			if (menuItem.Tag is not ProfileViewerForegroundMode foregroundMode) return;
+			_onForegroundModeChangedAction?.Invoke(foregroundMode);
+			ApplyForegroundMode(_foregroundOwner, foregroundMode);
+			UpdateForegroundModeMenuItems();
+		}
+
+
+		/// <summary>
+		/// 前面表示モードメニュー項目のチェック状態を更新します</summary>
+		private void UpdateForegroundModeMenuItems()
+		{
+			if (_parentForegroundMenuItem == null || _alwaysTopMostMenuItem == null || _normalForegroundMenuItem == null) return;
+			_parentForegroundMenuItem.Checked = _foregroundMode == ProfileViewerForegroundMode.ParentForeground;
+			_alwaysTopMostMenuItem.Checked = _foregroundMode == ProfileViewerForegroundMode.AlwaysTopMost;
+			_normalForegroundMenuItem.Checked = _foregroundMode == ProfileViewerForegroundMode.Normal;
+		}
+
+
+		/// <summary>
 		/// ロード時の処理です
 		/// <param name="sender">送信元情報</param>
 		/// <param name="e">イベント情報</param>
 		private void FormProfileViewer_Load(object sender, EventArgs e)
 		{
-			PP_Utility.SetTopMostWithoutFocus(this);
 			ResetWorkPbox();
 			SetData(_colorDatas, _distDatas);
 
+		}
+
+
+		/// <summary>
+		/// 前面表示モードを適用してフォームを表示します</summary>
+		/// <param name="owner">親フォーム</param>
+		/// <param name="foregroundMode">前面表示モード</param>
+		public void ShowWithForegroundMode(Form owner, ProfileViewerForegroundMode foregroundMode)
+		{
+			ApplyForegroundMode(owner, foregroundMode);
+			if (Visible == false)
+			{
+				if (foregroundMode == ProfileViewerForegroundMode.ParentForeground && owner != null) Show(owner);
+				else Show();
+			}
+			else
+			{
+				if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+				if (foregroundMode != ProfileViewerForegroundMode.Normal) BringToFront();
+			}
+		}
+
+
+		/// <summary>
+		/// 前面表示モードを適用します</summary>
+		/// <param name="owner">親フォーム</param>
+		/// <param name="foregroundMode">前面表示モード</param>
+		public void ApplyForegroundMode(Form owner, ProfileViewerForegroundMode foregroundMode)
+		{
+			if (owner != null) _foregroundOwner = owner;
+			_foregroundMode = foregroundMode;
+			var targetOwner = _foregroundOwner;
+			if (Owner != null && (foregroundMode != ProfileViewerForegroundMode.ParentForeground || Owner != targetOwner))
+			{
+				Owner.RemoveOwnedForm(this);
+			}
+
+			if (foregroundMode == ProfileViewerForegroundMode.ParentForeground && targetOwner != null && Owner != targetOwner)
+			{
+				targetOwner.AddOwnedForm(this);
+			}
+
+			TopMost = foregroundMode == ProfileViewerForegroundMode.AlwaysTopMost;
+			UpdateForegroundModeMenuItems();
 		}
 
 
@@ -299,10 +434,13 @@ namespace ColorImageViewProject
 			// グリッドラインの描画
 			// グリッド(描画がチェックされていてかつ0-255データ表示が行われるときにはグリッドを描画する
 			var cw = new CheckBox[] { cboxIsDrawColR, cboxIsDrawColG, cboxIsDrawColB, cboxIsDrawGray, cboxIsDrawColS };
-			if (cboxIsDrawGridline.Checked && cw.Any(c => c.Checked))
+			var isValueGridVisible = cboxIsDrawGridline.Checked && cw.Any(c => c.Checked);
+			var isProfileLengthGridVisible = cboxIsDrawGridline.Checked || cboxIsDrawGridlineH.Checked;
+			var profileLengthScaleStep = CreateScaleStep(_distDatas, 8);
+			if (isValueGridVisible)
 			{
 				// 横線
-				for (int yy = 0; yy < 255; yy += 10)
+				for (var yy = 0; yy < 255; yy += 10)
 				{
 					var pov = new PointF[] { new PointF(0, yy) };
 					_matWorkPbox.TransformPoints(pov);
@@ -332,18 +470,9 @@ namespace ColorImageViewProject
 			}
 
 			// どちらかのグリッドを表示する場合には縦(データ数）のグリッドラインを描画する
-			if (cboxIsDrawGridline.Checked || cboxIsDrawGridlineH.Checked)
+			if (isProfileLengthGridVisible)
 			{
-				// 縦線、データ100毎に(最大100本）
-				using (var vPen = new Pen(Color.LightGray, 1f))
-				{
-					for (int xx = 0; xx < 10000; xx += 100)
-					{
-						var pov = new PointF[] { new PointF(xx, 0) };
-						_matWorkPbox.TransformPoints( pov );
-						_graWorkPbox.DrawLine(vPen, pov[0].X, (float)0, pov[0].X, (float)_bmpWorkPbox.Height);
-					}
-				}
+				DrawProfileLengthGridLines(profileLengthScaleStep);
 			}
 
 			// データの描画
@@ -361,6 +490,158 @@ namespace ColorImageViewProject
 			}
 
 			DrawProfileCursorMarks();
+			DrawScaleLabels(isValueGridVisible, isProfileLengthGridVisible, profileLengthScaleStep);
+		}
+
+
+		/// <summary>
+		/// プロファイル長さ方向のグリッド線を描画します</summary>
+		/// <param name="scaleStep">目盛間隔</param>
+		private void DrawProfileLengthGridLines(double scaleStep)
+		{
+			if (scaleStep <= 0.0 || _distDatas <= 0.0) return;
+
+			using (var vPen = new Pen(Color.LightGray, 1f))
+			{
+				for (var xx = 0.0; xx <= _distDatas + scaleStep / 2.0; xx += scaleStep)
+				{
+					var xValue = Math.Min(xx, _distDatas);
+					var pov = new PointF[] { new PointF((float)xValue, 0) };
+					_matWorkPbox.TransformPoints(pov);
+					_graWorkPbox.DrawLine(vPen, pov[0].X, 0f, pov[0].X, _bmpWorkPbox.Height);
+					if (xValue >= _distDatas) break;
+				}
+			}
+		}
+
+
+		/// <summary>
+		/// グラフ目盛ラベルを描画します</summary>
+		/// <param name="isValueScaleVisible">輝度系Y目盛を表示する場合true</param>
+		/// <param name="isProfileLengthScaleVisible">プロファイル長さ方向目盛を表示する場合true</param>
+		/// <param name="profileLengthScaleStep">プロファイル長さ方向目盛間隔</param>
+		private void DrawScaleLabels(bool isValueScaleVisible, bool isProfileLengthScaleVisible, double profileLengthScaleStep)
+		{
+			if (_graWorkPbox == null || _bmpWorkPbox == null || _matWorkPbox == null) return;
+			if (_bmpWorkPbox.Width < 40 || _bmpWorkPbox.Height < 30) return;
+
+			using (var font = new Font(Font.FontFamily, 8f))
+			using (var brush = new SolidBrush(Color.FromArgb(210, Color.DimGray)))
+			using (var backBrush = new SolidBrush(Color.FromArgb(210, Color.White)))
+			using (var tickPen = new Pen(Color.FromArgb(180, Color.DimGray), 1f))
+			{
+				if (isValueScaleVisible) DrawValueScaleLabels(font, brush, backBrush, tickPen);
+				if (isProfileLengthScaleVisible) DrawProfileLengthScaleLabels(profileLengthScaleStep, font, brush, backBrush, tickPen);
+			}
+		}
+
+
+		/// <summary>
+		/// 輝度系Y目盛ラベルを描画します</summary>
+		/// <param name="font">描画フォント</param>
+		/// <param name="brush">文字ブラシ</param>
+		/// <param name="backBrush">背景ブラシ</param>
+		/// <param name="tickPen">目盛ペン</param>
+		private void DrawValueScaleLabels(Font font, Brush brush, Brush backBrush, Pen tickPen)
+		{
+			foreach (var value in new[] { 0, 50, 100, 150, 200, 250 })
+			{
+				var y = ValueToGraphY(value);
+				_graWorkPbox.DrawLine(tickPen, 0f, y, 6f, y);
+				DrawScaleLabel(value.ToString(), 8f, y - 7f, font, brush, backBrush);
+			}
+		}
+
+
+		/// <summary>
+		/// プロファイル長さ方向目盛ラベルを描画します</summary>
+		/// <param name="scaleStep">目盛間隔</param>
+		/// <param name="font">描画フォント</param>
+		/// <param name="brush">文字ブラシ</param>
+		/// <param name="backBrush">背景ブラシ</param>
+		/// <param name="tickPen">目盛ペン</param>
+		private void DrawProfileLengthScaleLabels(double scaleStep, Font font, Brush brush, Brush backBrush, Pen tickPen)
+		{
+			if (scaleStep <= 0.0 || _distDatas <= 0.0) return;
+
+			var lastRight = -1000f;
+			for (var xx = 0.0; xx <= _distDatas + scaleStep / 2.0; xx += scaleStep)
+			{
+				var xValue = Math.Min(xx, _distDatas);
+				var x = DistanceToGraphX(xValue);
+				var text = FormatScaleValue(xValue);
+				var size = _graWorkPbox.MeasureString(text, font);
+				var left = x - size.Width / 2f;
+				if (left > lastRight + 4f || xValue >= _distDatas)
+				{
+					_graWorkPbox.DrawLine(tickPen, x, _bmpWorkPbox.Height - 6f, x, _bmpWorkPbox.Height);
+					DrawScaleLabel(text, left, _bmpWorkPbox.Height - size.Height - 2f, font, brush, backBrush);
+					lastRight = left + size.Width;
+				}
+
+				if (xValue >= _distDatas) break;
+			}
+		}
+
+
+		/// <summary>
+		/// 目盛ラベルを描画します</summary>
+		/// <param name="text">表示テキスト</param>
+		/// <param name="x">描画X位置</param>
+		/// <param name="y">描画Y位置</param>
+		/// <param name="font">描画フォント</param>
+		/// <param name="brush">文字ブラシ</param>
+		/// <param name="backBrush">背景ブラシ</param>
+		private void DrawScaleLabel(string text, float x, float y, Font font, Brush brush, Brush backBrush)
+		{
+			var size = _graWorkPbox.MeasureString(text, font);
+			var drawX = Math.Max(1f, Math.Min(_bmpWorkPbox.Width - size.Width - 1f, x));
+			var drawY = Math.Max(1f, Math.Min(_bmpWorkPbox.Height - size.Height - 1f, y));
+			_graWorkPbox.FillRectangle(backBrush, drawX, drawY, size.Width, size.Height);
+			_graWorkPbox.DrawString(text, font, brush, drawX, drawY);
+		}
+
+
+		/// <summary>
+		/// 目盛値を読みやすい文字列に整形します</summary>
+		/// <param name="value">目盛値</param>
+		/// <returns>目盛表示文字列</returns>
+		private string FormatScaleValue(double value)
+		{
+			if (Math.Abs(value - Math.Round(value)) < 0.001) return value.ToString("0");
+			if (Math.Abs(value) >= 10.0) return value.ToString("0.0");
+			return value.ToString("0.00");
+		}
+
+
+		/// <summary>
+		/// 読みやすい目盛間隔を生成します</summary>
+		/// <param name="maxValue">最大値</param>
+		/// <param name="targetTickCount">目標目盛数</param>
+		/// <returns>目盛間隔</returns>
+		private double CreateScaleStep(double maxValue, int targetTickCount)
+		{
+			if (maxValue <= 0.0) return 1.0;
+
+			var roughStep = maxValue / Math.Max(1, targetTickCount);
+			var magnitude = Math.Pow(10.0, Math.Floor(Math.Log10(roughStep)));
+			var normalized = roughStep / magnitude;
+			if (normalized <= 1.0) return magnitude;
+			if (normalized <= 2.0) return magnitude * 2.0;
+			if (normalized <= 5.0) return magnitude * 5.0;
+			return magnitude * 10.0;
+		}
+
+
+		/// <summary>
+		/// 値をグラフY座標に変換します</summary>
+		/// <param name="value">値</param>
+		/// <returns>グラフY座標</returns>
+		private float ValueToGraphY(double value)
+		{
+			var pov = new PointF[] { new PointF(0f, (float)value) };
+			_matWorkPbox.TransformPoints(pov);
+			return pov[0].Y;
 		}
 
 
