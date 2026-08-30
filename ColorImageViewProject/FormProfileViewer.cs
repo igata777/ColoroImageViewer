@@ -1020,7 +1020,7 @@ namespace ColorImageViewProject
 		private string CreateProfileFocusText(string title, int bgnIdx, int endIdx)
 		{
 			if (TryCalculateProfileFocusMetrics(bgnIdx, endIdx, out var adjacentSquareMean, out var adjacentRms, out var laplacianSquareMean) == false) return $"{title}: ----";
-			return $"{title}: 隣接輝度差二乗平均={FormatMetricValue(adjacentSquareMean)}, 平方根={FormatMetricValue(adjacentRms)}, ラプラシアン二乗平均={FormatMetricValue(laplacianSquareMean)}";
+			return $"{title}: 隣接輝度差二乗平均={FormatMetricValue(adjacentSquareMean)}, RMS={FormatMetricValue(adjacentRms)}, ラプラシアン二乗平均={FormatMetricValue(laplacianSquareMean)}";
 		}
 
 
@@ -1029,7 +1029,7 @@ namespace ColorImageViewProject
 		/// <param name="bgnIdx">開始インデックス</param>
 		/// <param name="endIdx">終了インデックス</param>
 		/// <param name="adjacentSquareMean">隣接輝度差二乗平均</param>
-		/// <param name="adjacentRms">隣接輝度差二乗平均の平方根</param>
+		/// <param name="adjacentRms">隣接輝度差RMS</param>
 		/// <param name="laplacianSquareMean">ラプラシアン二乗平均</param>
 		/// <returns>算出できた場合true</returns>
 		private bool TryCalculateProfileFocusMetrics(int bgnIdx, int endIdx, out double adjacentSquareMean, out double adjacentRms, out double laplacianSquareMean)
@@ -1085,9 +1085,7 @@ namespace ColorImageViewProject
 		private string FormatMetricValue(double value)
 		{
 			if (Double.IsNaN(value) || Double.IsInfinity(value)) return "----";
-			if (Math.Abs(value) >= 1000.0) return value.ToString("0");
-			if (Math.Abs(value) >= 100.0) return value.ToString("0.0");
-			return value.ToString("0.00");
+			return value.ToString("0.000");
 		}
 
 
