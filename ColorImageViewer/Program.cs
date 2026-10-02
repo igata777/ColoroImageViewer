@@ -7,6 +7,8 @@ using System.Windows.Forms;
 using System.IO.Pipes;
 using System.Text.Json;
 using System.IO;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 using System.Runtime.Versioning;			// ワーニング対策
 
 
@@ -15,6 +17,14 @@ namespace ColorImageViewer
 	[SupportedOSPlatform("windows6.1")]         // ワーニング対策
 	static class Program
 	{
+		[DllImport("kernel32.dll", SetLastError = true)]
+		[return: MarshalAs(UnmanagedType.Bool)]
+		private static extern bool GetNamedPipeServerProcessId(SafePipeHandle pipe, out uint serverProcessId);
+
+		[DllImport("user32.dll", SetLastError = true)]
+		[return: MarshalAs(UnmanagedType.Bool)]
+		private static extern bool AllowSetForegroundWindow(uint processId);
+
 		/// <summary>
 		/// アプリケーションのメイン エントリ ポイントです。
 		/// </summary>
@@ -106,6 +116,12 @@ namespace ColorImageViewer
                 using (var client = new NamedPipeClientStream(".", "MyImageViewerPipe", PipeDirection.Out))
                 {
                     await client.ConnectAsync(5000);
+
+					// ユーザー操作で起動されたプロセスから、既存ビューアーに前面表示を許可する。
+					if (GetNamedPipeServerProcessId(client.SafePipeHandle, out var serverProcessId))
+					{
+						AllowSetForegroundWindow(serverProcessId);
+					}
 
                     var message = CreatePipeMessage(args);
 

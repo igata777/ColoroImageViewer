@@ -98,12 +98,12 @@ namespace ColorImageViewer
 
 		/// <summary>
 		/// _countの値によりフォームの表示・非表示を設定します</summary>
-		private void SetFormVisible()
+		private void SetFormVisible(bool activate = true)
 		{
 			var isHidden = _count > 0 || _isOpeningInitialFiles;
 			(this.Visible, this.Opacity, this.Enabled) = isHidden ? ( false, 0, false ) : ( true, 1.00, true );
 
-			if( this.Visible )
+			if( this.Visible && activate )
 			{
 			    this.WindowState = FormWindowState.Normal;
 				this.BringToFront();
@@ -162,7 +162,7 @@ namespace ColorImageViewer
 			{
 				if (isInit) _isOpeningInitialFiles = false;
 				_isOpeningImages = false;
-				SetFormVisible();
+				SetFormVisible(activate: false);
 			}
 		}
 
@@ -201,7 +201,7 @@ namespace ColorImageViewer
 			{
 				if (isInit) _isOpeningInitialFiles = false;
 				_isOpeningImages = false;
-				SetFormVisible();
+				SetFormVisible(activate: false);
 			}
 		}
 

@@ -237,6 +237,7 @@ namespace ColorImageViewProject
 		/// <returns>生成したビットマップ</returns>
 		static public Bitmap LoadBitmapPF( string filepath, PixelFormat pf )
 		{
+			using var timing = ProcessingTimings.Measure("ファイル読み込み・デコード・画素形式変換");
 			Bitmap ret = null;
 			try
 			{

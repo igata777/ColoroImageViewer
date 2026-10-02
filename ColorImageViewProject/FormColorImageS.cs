@@ -193,6 +193,10 @@ namespace ColorImageViewProject
 		public FormColorImageS(Bitmap bmp, string title, bool isHitAnyKey = false, int posX = -1, int posY = -1, string initDispInfoString= null, ColImageSetteings setdata= null, Icon icon= null, Action　onClosed = null, bool? isFitWidth= null, bool isProfileFunction= true, bool isTakeOwnership = false, Action onOpened = null )
 		{
 			InitializeComponent();
+			InitializeViewSynchronization();
+			var timingMenu = new ToolStripMenuItem("処理時間の計測...");
+			timingMenu.Click += (_, _) => ProcessingTimings.ShowReport(this);
+			contextMenuStripL.Items.Add(timingMenu);
 			InitializeClipboardImageOpenMenuItem();
 			InitializeAverageColorImageMenuItem();
 			FormClosing += FormColorImageS_FormClosing;
@@ -365,9 +369,11 @@ namespace ColorImageViewProject
 		[SupportedOSPlatform("windows")]
 		static public async Task<ImageFilesOpenResult> OpenImageFilesAsync(Form owner, IEnumerable<string> filePaths, Icon icon, Action onClosed = null, Action onOpened = null)
 		{
+			using var timing = ProcessingTimings.Measure("ファイルを開く全体（複数枚は一括）");
 			var files = filePaths?.Where(w => String.IsNullOrWhiteSpace(w) == false).ToArray() ?? Array.Empty<string>();
 			var result = new ImageFilesOpenResult();
 			var failureList = new List<(string FileName, string Reason)>();
+			FormColorImageS lastOpenedForm = null;
 			if (files.Length < 1)
 			{
 				return result;
@@ -412,9 +418,11 @@ namespace ColorImageViewProject
 						try
 						{
 							progressForm.SetCurrentFile(i + 1, files.Length, $"{loadResult.FileName} 表示準備中");
+							using var displayTiming = ProcessingTimings.Measure("画像ウィンドウの作成・初回表示");
 							var frm = new FormColorImageS(bmp, loadResult.FileName, false, -1, -1, null, null, icon, onClosed, null, true, true, onOpened);
 							bmp = null;
 							frm.Show();
+							lastOpenedForm = frm;
 							onOpened?.Invoke();
 							result.OpenCount++;
 						}
@@ -432,6 +440,13 @@ namespace ColorImageViewProject
 				}
 
 				progressForm.Close();
+			}
+
+			// 進捗画面を閉じた際に元の画面へフォーカスが戻るため、最後の画像を前面にする。
+			if (lastOpenedForm != null && !lastOpenedForm.IsDisposed && lastOpenedForm.Visible)
+			{
+				lastOpenedForm.BringToFront();
+				lastOpenedForm.Activate();
 			}
 
 			result.Failures = failureList.ToArray();
@@ -494,6 +509,7 @@ namespace ColorImageViewProject
 				OnPaintPbox
 			);
 			//　ScalablePbox規定値・および設定
+			_scalePbox.ViewChanged += SynchronizeViews;
 			_scalePbox.MaxRateMainImage = 100.0f;
 			_scalePbox.MinRateMainImage = 0.125f;
 			_scalePbox.BasePbox.BackColor = _settings != null ? _settings.BackColor : Color.Black ;
@@ -1367,6 +1383,10 @@ namespace ColorImageViewProject
 		{
 			var rect = _scalePbox.GetDispRect();
 			DispInfoToClipBoardEx( rect.X, rect.Y, _scalePbox.DispRate, _scalePbox.BasePbox.Width, _scalePbox.BasePbox.Height, _isProfModeLine, _measureModePointB, _measureModePointE, this.Location);
+			var copyData = new DataObject();
+			copyData.SetText(Clipboard.GetText());
+			copyData.SetData(ViewSourceClipboardFormat, _viewSourceId);
+			Clipboard.SetDataObject(copyData, true);
 		}
 
 
@@ -1732,14 +1752,9 @@ namespace ColorImageViewProject
 			if( _sourceImage== null ) return;
 			using (var bmp = _sourceImage.Clone(new Rectangle(0, 0, _sourceImage.Width, _sourceImage.Height), PixelFormat.Format24bppRgb))
 			{
-				using (var gra = Graphics.FromImage(bmp))
-				using (var pen = new Pen(Color.Red, 3.0f) { Alignment = PenAlignment.Outset })
-				{
-					// 表示領域の太線はPenAlignmentは外側に描画するためOutsetを指定（ただし.NETの不具合で Outsetでも中央描画してしまうとのこと2022.04.01現在）
-					pen.Alignment = PenAlignment.Outset;	
-					gra.DrawRectangleFs(pen, new[] { _scalePbox.GetDispRect() });
-				}
 				var frm = new FormColorImageS(bmp, this.Text + "表示領域", false, -1, -1, null, _settings, null, _actOnClosed, onOpened: _actOnOpened);
+				frm._displayFrameOverlay = _scalePbox.GetDispRect();
+				frm.InitializeFrameSaveMenu();
 				ShowLinkedImageForm(frm);
 			}
 
@@ -1794,8 +1809,33 @@ namespace ColorImageViewProject
 		/// <param name="gra">描画対象Grahics</param>
 		/// <param name="siz">画像サイズ</param>
 		[SupportedOSPlatform("windows")]
+		private RectangleF? _displayFrameOverlay;
+
+		private void DrawDisplayFrameOverlay(Graphics graphics)
+		{
+			if (!_displayFrameOverlay.HasValue) return;
+			var rect = _displayFrameOverlay.Value;
+			var corners = new[]
+			{
+				new PointF(rect.Left, rect.Top), new PointF(rect.Right, rect.Top),
+				new PointF(rect.Right, rect.Bottom), new PointF(rect.Left, rect.Bottom)
+			};
+			// 枠の位置だけ表示座標へ変換し、線幅は画像の拡大縮小から独立させる。
+			using (var transform = graphics.Transform) transform.TransformPoints(corners);
+			var state = graphics.Save();
+			try
+			{
+				graphics.ResetTransform();
+				graphics.SmoothingMode = SmoothingMode.None;
+				using var pen = new Pen(Color.Red, 3.0f);
+				graphics.DrawPolygon(pen, corners);
+			}
+			finally { graphics.Restore(state); }
+		}
+
 		private void OnPaintPbox(Graphics gra, Size siz)
 		{
+			DrawDisplayFrameOverlay(gra);
 			// 距離測定用のカーソル表示
 			DispMeasureMode(gra);
 
@@ -2425,6 +2465,7 @@ namespace ColorImageViewProject
 		[SupportedOSPlatform("windows")]
 		private unsafe bool TryCalculateAverageColorFromRect(Bitmap bmp, Rectangle rect, out Color avgColor)
 		{
+			using var timing = ProcessingTimings.Measure("矩形の平均色計算");
 			avgColor = Color.Empty;
 			if (IsRectInBitmap(bmp, rect) == false) return false;
 
@@ -2599,6 +2640,7 @@ namespace ColorImageViewProject
 		[SupportedOSPlatform("windows")]
 		private unsafe Color[] GetProfileColorsH(Bitmap bmp, Rectangle rect)
 		{
+			using var timing = ProcessingTimings.Measure("水平プロファイル計算");
 			try
 			{
 				if (IsRectInBitmap(bmp, rect) == false) return null;
@@ -2662,6 +2704,7 @@ namespace ColorImageViewProject
 		[SupportedOSPlatform("windows")]
 		private unsafe Color[] GetProfileColorsV(Bitmap bmp, Rectangle rect)
 		{
+			using var timing = ProcessingTimings.Measure("垂直プロファイル計算");
 			try
 			{
 				if (IsRectInBitmap(bmp, rect) == false) return null;
@@ -3315,7 +3358,9 @@ namespace ColorImageViewProject
 							e.Handled = true;           // 以下のコントロールにキーを渡さない
 							break;
 						case Keys.S:
-							元画像をファイルに保存ToolStripMenuItem_Click(sender, null);
+							if (_displayFrameOverlay.HasValue) ShowFrameSaveOptions();
+							else 元画像をファイルに保存ToolStripMenuItem_Click(sender, null);
+							e.SuppressKeyPress = true;
 							e.Handled = true;           // 以下のコントロールにキーを渡さない
 							break;
 						case Keys.B:

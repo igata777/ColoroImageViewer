@@ -30,6 +30,10 @@ namespace ColorImageViewProject
 	{
 		private bool _disposed = false;
 
+		/// <summary>描画時に表示行列が変わっていた場合に通知します。</summary>
+		public event Action ViewChanged;
+		private float[] _lastNotifiedView;
+
         // メインピクチャーボックスのマウスによる拡大、縮小
         /// <summary> マウスダウンフラグです </summary>
         protected bool _mainPictureBoxMouseDownFlg = false;
@@ -203,6 +207,16 @@ namespace ColorImageViewProject
 			}
             if (_mainImage== null || _mainImage.Bmap == null) return;
 			if (_pictBox == null || _pictBox.Width <= 0 || _pictBox.Height <= 0) return;
+			using var timing = ProcessingTimings.Measure("画像の描画");
+			if (ViewChanged != null)
+			{
+				var elements = _mainImage.Mat.Elements;
+				if (_lastNotifiedView == null || !elements.SequenceEqual(_lastNotifiedView))
+				{
+					_lastNotifiedView = elements;
+					ViewChanged.Invoke();
+				}
+			}
 
 			// 補間モードの設定
 			try
